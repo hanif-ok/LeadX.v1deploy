@@ -22,8 +22,7 @@ est.dart:369:27: Error:
         expect(state, 
 isA<AppAuthStateAuthenticated>());
                           
-^^^^^^^^^^^^^^^^^^^^^^^^^
-test/data/repositories/auth_repository_impl_t
+^^^^^^^^^^^^^^^^^^^^^^^^test/data/repositories/auth_repository_impl_t
 est.dart:77:52: Error: The argument type 
 'MockPostgrestFilterBuilder<dynamic>' can't 
 be assigned to the parameter type 
