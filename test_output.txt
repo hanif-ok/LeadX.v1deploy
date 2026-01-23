@@ -18,7 +18,7 @@ isA<AppAuthStateUnauthenticated>());
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^
 test/data/repositories/auth_repository_impl_t
 est.dart:369:27: Error: 
-'AppAuthStateAuthenticated' isn't a type.
+'AppAuthStateAuthenticated' isn't a typed.
         expect(state, 
 isA<AppAuthStateAuthenticated>());
                           
