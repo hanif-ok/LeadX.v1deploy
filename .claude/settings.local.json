@@ -1,0 +1,18 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(dart run build_runner:*)",
+      "Bash(dart analyze:*)",
+      "Bash(flutter pub get:*)",
+      "Bash(flutter analyze:*)",
+      "Bash(grep:*)",
+      "Bash(git log:*)",
+      "Bash(flutter --version:*)",
+      "Bash(git checkout:*)",
+      "Bash(flutter run:*)",
+      "WebFetch(domain:supabase.com)",
+      "WebFetch(domain:github.com)",
+      "Bash(iconv:*)"
+    ]
+  }
+}

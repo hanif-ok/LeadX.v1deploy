@@ -213,15 +213,9 @@ class _CustomerFormScreenState extends ConsumerState<CustomerFormScreen> {
             const SizedBox(height: 16),
             AppTextField(
               controller: _addressController,
-              label: 'Alamat *',
+              label: 'Alamat',
               hint: 'Masukkan alamat lengkap',
               maxLines: 3,
-              validator: (value) {
-                if (value == null || value.isEmpty) {
-                  return 'Alamat wajib diisi';
-                }
-                return null;
-              },
             ),
             const SizedBox(height: 16),
 
@@ -453,36 +447,38 @@ class _CustomerFormScreenState extends ConsumerState<CustomerFormScreen> {
   }
 
   Widget _buildBottomBar(CustomerFormState formState, ThemeData theme) {
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: theme.colorScheme.surface,
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.1),
-            blurRadius: 8,
-            offset: const Offset(0, -2),
-          ),
-        ],
-      ),
-      child: Row(
-        children: [
-          Expanded(
-            child: OutlinedButton(
-              onPressed: () => context.pop(),
-              child: const Text('Batal'),
+    return SafeArea(
+      child: Container(
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: theme.colorScheme.surface,
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.1),
+              blurRadius: 8,
+              offset: const Offset(0, -2),
             ),
-          ),
-          const SizedBox(width: 16),
-          Expanded(
-            flex: 2,
-            child: AppButton(
-              label: widget.isEditing ? 'Update' : 'Simpan',
-              isLoading: formState.isLoading,
-              onPressed: _handleSave,
+          ],
+        ),
+        child: Row(
+          children: [
+            Expanded(
+              child: OutlinedButton(
+                onPressed: () => context.pop(),
+                child: const Text('Batal'),
+              ),
             ),
-          ),
-        ],
+            const SizedBox(width: 16),
+            Expanded(
+              flex: 2,
+              child: AppButton(
+                label: widget.isEditing ? 'Update' : 'Simpan',
+                isLoading: formState.isLoading,
+                onPressed: _handleSave,
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -514,7 +510,9 @@ class _CustomerFormScreenState extends ConsumerState<CustomerFormScreen> {
         widget.customerId!,
         CustomerUpdateDto(
           name: _nameController.text,
-          address: _addressController.text,
+          address: _addressController.text.isNotEmpty
+              ? _addressController.text
+              : null,
           provinceId: _selectedProvinceId,
           cityId: _selectedCityId,
           postalCode: _postalCodeController.text.isNotEmpty
@@ -536,7 +534,9 @@ class _CustomerFormScreenState extends ConsumerState<CustomerFormScreen> {
       formNotifier.createCustomer(
         CustomerCreateDto(
           name: _nameController.text,
-          address: _addressController.text,
+          address: _addressController.text.isNotEmpty
+              ? _addressController.text
+              : null,
           provinceId: _selectedProvinceId!,
           cityId: _selectedCityId!,
           companyTypeId: _selectedCompanyTypeId!,

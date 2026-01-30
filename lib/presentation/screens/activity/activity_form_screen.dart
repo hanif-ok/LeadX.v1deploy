@@ -13,6 +13,7 @@ import '../../providers/activity_providers.dart';
 import '../../providers/broker_providers.dart';
 import '../../providers/customer_providers.dart';
 import '../../providers/hvc_providers.dart';
+import '../../providers/master_data_providers.dart';
 import '../../widgets/common/searchable_dropdown.dart';
 
 /// Screen for creating/scheduling activities.
@@ -39,10 +40,11 @@ class _ActivityFormScreenState extends ConsumerState<ActivityFormScreen> {
   
   String? _selectedObjectType;
   String? _selectedObjectId;
+  String? _selectedKeyPersonId;
   String? _selectedActivityTypeId;
   DateTime _scheduledDate = DateTime.now();
   TimeOfDay _scheduledTime = TimeOfDay.now();
-  
+
   final _summaryController = TextEditingController();
   final _notesController = TextEditingController();
   
@@ -91,7 +93,7 @@ class _ActivityFormScreenState extends ConsumerState<ActivityFormScreen> {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final formState = ref.watch(activityFormNotifierProvider);
-    final activityTypesAsync = ref.watch(activityTypesProvider);
+    final activityTypesAsync = ref.watch(activityTypesStreamProvider);
 
     // Listen for successful save
     ref.listen<ActivityFormState>(activityFormNotifierProvider, (prev, next) {
@@ -120,11 +122,12 @@ class _ActivityFormScreenState extends ConsumerState<ActivityFormScreen> {
       appBar: AppBar(
         title: Text(widget.isImmediate ? 'Log Aktivitas' : 'Jadwalkan Aktivitas'),
       ),
-      body: Form(
-        key: _formKey,
-        child: ListView(
-          padding: const EdgeInsets.all(16),
-          children: [
+      body: SafeArea(
+        child: Form(
+          key: _formKey,
+          child: ListView(
+            padding: const EdgeInsets.all(16),
+            children: [
             // Object Type Selection (if not pre-selected)
             if (widget.objectType == null) ...[
               Text(
@@ -158,6 +161,7 @@ class _ActivityFormScreenState extends ConsumerState<ActivityFormScreen> {
                   setState(() {
                     _selectedObjectType = selected.first;
                     _selectedObjectId = null;
+                    _selectedKeyPersonId = null; // Reset key person when object type changes
                   });
                 },
               ),
@@ -180,12 +184,24 @@ class _ActivityFormScreenState extends ConsumerState<ActivityFormScreen> {
                 ),
               ),
               const SizedBox(height: 16),
+              // Key Person selection (if object is selected)
+              if (widget.objectType != null)
+                _buildKeyPersonField(theme),
+              const SizedBox(height: 16),
             ],
+
+            // Key Person selection for dynamically selected objects
+            if (widget.objectType == null && _selectedObjectId != null)
+              _buildKeyPersonField(theme),
+            if (widget.objectType == null && _selectedObjectId != null)
+              const SizedBox(height: 16),
 
             // Activity Type Selection
             Text(
               'Tipe Aktivitas',
-              style: theme.textTheme.titleSmall,
+              style: theme.textTheme.titleSmall?.copyWith(
+                color: theme.colorScheme.onSurface,
+              ),
             ),
             const SizedBox(height: 8),
             activityTypesAsync.when(
@@ -212,6 +228,11 @@ class _ActivityFormScreenState extends ConsumerState<ActivityFormScreen> {
                     return ChoiceChip(
                       label: Text(type.name),
                       selected: isSelected,
+                      labelStyle: TextStyle(
+                        color: isSelected
+                            ? theme.colorScheme.onSecondaryContainer
+                            : theme.colorScheme.onSurface,
+                      ),
                       onSelected: (selected) {
                         final newTypeId = selected ? type.id : null;
                         setState(() {
@@ -226,7 +247,7 @@ class _ActivityFormScreenState extends ConsumerState<ActivityFormScreen> {
                         _getActivityTypeIcon(type.icon),
                         size: 18,
                         color: isSelected
-                            ? theme.colorScheme.onPrimaryContainer
+                            ? theme.colorScheme.onSecondaryContainer
                             : theme.colorScheme.onSurfaceVariant,
                       ),
                     );
@@ -325,8 +346,11 @@ class _ActivityFormScreenState extends ConsumerState<ActivityFormScreen> {
                       ? 'Catat Aktivitas'
                       : 'Jadwalkan Aktivitas'),
             ),
+            // Safe area bottom padding
+            SizedBox(height: MediaQuery.of(context).padding.bottom + 16),
           ],
         ),
+      ),
       ),
     );
   }
@@ -401,6 +425,7 @@ class _ActivityFormScreenState extends ConsumerState<ActivityFormScreen> {
         customerId: objectType == 'CUSTOMER' ? objectId : null,
         hvcId: objectType == 'HVC' ? objectId : null,
         brokerId: objectType == 'BROKER' ? objectId : null,
+        keyPersonId: _selectedKeyPersonId,
         summary: _summaryController.text.isNotEmpty
             ? _summaryController.text
             : null,
@@ -432,6 +457,7 @@ class _ActivityFormScreenState extends ConsumerState<ActivityFormScreen> {
         customerId: objectType == 'CUSTOMER' ? objectId : null,
         hvcId: objectType == 'HVC' ? objectId : null,
         brokerId: objectType == 'BROKER' ? objectId : null,
+        keyPersonId: _selectedKeyPersonId,
         summary: _summaryController.text.isNotEmpty
             ? _summaryController.text
             : null,
@@ -504,6 +530,165 @@ class _ActivityFormScreenState extends ConsumerState<ActivityFormScreen> {
     }
   }
 
+  /// Build key person field based on selected object type.
+  Widget _buildKeyPersonField(ThemeData theme) {
+    final objectType = _selectedObjectType ?? widget.objectType;
+    final objectId = _selectedObjectId ?? widget.objectId;
+
+    if (objectType == null || objectId == null) {
+      return const SizedBox.shrink();
+    }
+
+    switch (objectType) {
+      case 'CUSTOMER':
+        return _buildCustomerKeyPersonField(theme);
+      case 'HVC':
+        return _buildHvcKeyPersonField(theme);
+      case 'BROKER':
+        return _buildBrokerKeyPersonField(theme);
+      default:
+        return const SizedBox.shrink();
+    }
+  }
+
+  Widget _buildCustomerKeyPersonField(ThemeData theme) {
+    final keyPersonsAsync = ref.watch(customerKeyPersonsProvider(_selectedObjectId!));
+
+    return keyPersonsAsync.when(
+      data: (keyPersons) {
+        if (keyPersons.isEmpty) {
+          return Card(
+            child: Padding(
+              padding: const EdgeInsets.all(16),
+              child: Text(
+                'Belum ada key person untuk customer ini',
+                style: theme.textTheme.bodyMedium?.copyWith(
+                  color: theme.colorScheme.outline,
+                ),
+              ),
+            ),
+          );
+        }
+        return SearchableDropdown<String>(
+          label: 'Key Person (Opsional)',
+          hint: 'Pilih key person customer...',
+          modalTitle: 'Pilih Key Person',
+          searchHint: 'Cari key person...',
+          prefixIcon: Icons.person,
+          value: _selectedKeyPersonId,
+          items: keyPersons.map((kp) {
+            return DropdownItem(
+              value: kp.id,
+              label: kp.displayNameWithPosition,
+              subtitle: kp.position,
+              icon: Icons.person,
+            );
+          }).toList(),
+          onChanged: (value) {
+            setState(() {
+              _selectedKeyPersonId = value;
+            });
+          },
+        );
+      },
+      loading: () => const Center(child: CircularProgressIndicator()),
+      error: (e, _) => const SizedBox.shrink(),
+    );
+  }
+
+  Widget _buildBrokerKeyPersonField(ThemeData theme) {
+    final keyPersonsAsync = ref.watch(brokerKeyPersonsProvider(_selectedObjectId!));
+
+    return keyPersonsAsync.when(
+      data: (keyPersons) {
+        if (keyPersons.isEmpty) {
+          return Card(
+            child: Padding(
+              padding: const EdgeInsets.all(16),
+              child: Text(
+                'Belum ada key person untuk broker ini',
+                style: theme.textTheme.bodyMedium?.copyWith(
+                  color: theme.colorScheme.outline,
+                ),
+              ),
+            ),
+          );
+        }
+        return SearchableDropdown<String>(
+          label: 'Key Person (Opsional)',
+          hint: 'Pilih key person broker...',
+          modalTitle: 'Pilih Key Person',
+          searchHint: 'Cari key person...',
+          prefixIcon: Icons.person,
+          value: _selectedKeyPersonId,
+          items: keyPersons.map((kp) {
+            return DropdownItem(
+              value: kp.id,
+              label: kp.displayNameWithPosition,
+              subtitle: kp.position,
+              icon: Icons.person,
+            );
+          }).toList(),
+          onChanged: (value) {
+            setState(() {
+              _selectedKeyPersonId = value;
+            });
+          },
+        );
+      },
+      loading: () => const Center(child: CircularProgressIndicator()),
+      error: (e, _) => const SizedBox.shrink(),
+    );
+  }
+
+  Widget _buildHvcKeyPersonField(ThemeData theme) {
+    final objectId = _selectedObjectId ?? widget.objectId;
+    if (objectId == null) return const SizedBox.shrink();
+
+    final keyPersonsAsync = ref.watch(hvcKeyPersonsProvider(objectId));
+
+    return keyPersonsAsync.when(
+      data: (keyPersons) {
+        if (keyPersons.isEmpty) {
+          return Card(
+            child: Padding(
+              padding: const EdgeInsets.all(16),
+              child: Text(
+                'Belum ada key person untuk HVC ini',
+                style: theme.textTheme.bodyMedium?.copyWith(
+                  color: theme.colorScheme.outline,
+                ),
+              ),
+            ),
+          );
+        }
+        return SearchableDropdown<String>(
+          label: 'Key Person (Opsional)',
+          hint: 'Pilih key person HVC...',
+          modalTitle: 'Pilih Key Person',
+          searchHint: 'Cari key person...',
+          prefixIcon: Icons.person,
+          value: _selectedKeyPersonId,
+          items: keyPersons.map((kp) {
+            return DropdownItem(
+              value: kp.id,
+              label: kp.displayNameWithPosition,
+              subtitle: kp.position,
+              icon: Icons.person,
+            );
+          }).toList(),
+          onChanged: (value) {
+            setState(() {
+              _selectedKeyPersonId = value;
+            });
+          },
+        );
+      },
+      loading: () => const Center(child: CircularProgressIndicator()),
+      error: (e, _) => const SizedBox.shrink(),
+    );
+  }
+
   /// Build entity picker based on selected object type.
   Widget _buildEntityPicker(ThemeData theme) {
     switch (_selectedObjectType) {
@@ -555,6 +740,7 @@ class _ActivityFormScreenState extends ConsumerState<ActivityFormScreen> {
           onChanged: (value) {
             setState(() {
               _selectedObjectId = value;
+              _selectedKeyPersonId = null; // Reset key person when customer changes
             });
           },
         );
@@ -645,6 +831,7 @@ class _ActivityFormScreenState extends ConsumerState<ActivityFormScreen> {
           onChanged: (value) {
             setState(() {
               _selectedObjectId = value;
+              _selectedKeyPersonId = null; // Reset key person when broker changes
             });
           },
         );

@@ -6,6 +6,7 @@ import '../../../data/dtos/hvc_dtos.dart';
 import '../../../domain/entities/hvc.dart';
 import '../../providers/gps_providers.dart';
 import '../../providers/hvc_providers.dart';
+import '../../providers/master_data_providers.dart';
 import '../../widgets/common/searchable_dropdown.dart';
 
 /// Screen for creating or editing an HVC.
@@ -65,7 +66,7 @@ class _HvcFormScreenState extends ConsumerState<HvcFormScreen> {
   @override
   Widget build(BuildContext context) {
     final formState = ref.watch(hvcFormNotifierProvider);
-    final hvcTypesAsync = ref.watch(hvcTypesProvider);
+    final hvcTypesAsync = ref.watch(hvcTypesStreamProvider);
 
     // If editing, load existing HVC data
     if (widget.isEditing && !_isInitialized) {
@@ -101,11 +102,13 @@ class _HvcFormScreenState extends ConsumerState<HvcFormScreen> {
       appBar: AppBar(
         title: Text(widget.isEditing ? 'Edit HVC' : 'Tambah HVC'),
       ),
-      body: Form(
-        key: _formKey,
-        child: ListView(
-          padding: const EdgeInsets.all(16),
-          children: [
+      body: SafeArea(
+        top: false,
+        child: Form(
+          key: _formKey,
+          child: ListView(
+            padding: const EdgeInsets.all(16),
+            children: [
             // HVC Type
             hvcTypesAsync.when(
               data: (types) => SearchableDropdown<String>(
@@ -239,8 +242,11 @@ class _HvcFormScreenState extends ConsumerState<HvcFormScreen> {
                     )
                   : Text(widget.isEditing ? 'Simpan' : 'Buat HVC'),
             ),
+            // Safe area bottom padding
+            SizedBox(height: MediaQuery.of(context).padding.bottom + 16),
           ],
         ),
+      ),
       ),
     );
   }

@@ -8,6 +8,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_web_plugins/url_strategy.dart';
+import 'package:intl/date_symbol_data_local.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import 'app.dart';
@@ -26,11 +27,15 @@ Future<void> main() async {
   final envConfig = EnvConfig.instance;
   envConfig.validate();
 
-  // Initialize Supabase
+  // Initialize Supabase with PKCE flow (more secure)
+  // Note: Password reset links must be opened in the same browser session
   await Supabase.initialize(
     url: envConfig.supabaseUrl,
     anonKey: envConfig.supabaseAnonKey,
   );
+
+  // Initialize locale data for Indonesian date formatting
+  await initializeDateFormatting('id_ID', null);
 
   // Run the app
   runApp(

@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 
 import '../../../config/routes/route_names.dart';
 import '../../../core/theme/app_colors.dart';
+import '../../../domain/entities/user.dart';
 import '../../providers/auth_providers.dart';
 import '../../providers/sync_providers.dart';
 import '../../screens/home/widgets/home_drawer.dart';
@@ -31,6 +32,13 @@ class ResponsiveShell extends ConsumerStatefulWidget {
 
 class _ResponsiveShellState extends ConsumerState<ResponsiveShell> {
   int _selectedIndex = 0;
+
+  @override
+  void initState() {
+    super.initState();
+    // Set initial index directly (no setState needed before first build)
+    _selectedIndex = _getIndexForRoute(widget.currentRoute);
+  }
 
   static const List<_NavItem> _navItems = [
     _NavItem(
@@ -65,21 +73,30 @@ class _ResponsiveShellState extends ConsumerState<ResponsiveShell> {
     _updateSelectedIndex();
   }
 
-  void _updateSelectedIndex() {
-    final route = widget.currentRoute;
+  int _getIndexForRoute(String route) {
     if (route.contains('/profile')) {
-      _selectedIndex = 3;
+      return 3;
     } else if (route.contains('/activities')) {
-      _selectedIndex = 2;
+      return 2;
     } else if (route.contains('/customers')) {
-      _selectedIndex = 1;
-    } else if (route.contains('/hvcs') || route.contains('/brokers') || 
-               route.contains('/scoreboard') || route.contains('/cadence')) {
+      return 1;
+    } else if (route.contains('/hvcs') || route.contains('/brokers') ||
+               route.contains('/referrals') || route.contains('/scoreboard') ||
+               route.contains('/cadence')) {
       // These are sidebar items, not main nav items
       // Set to -1 so no bottom nav item is highlighted
-      _selectedIndex = -1;
+      return -1;
     } else {
-      _selectedIndex = 0;
+      return 0;
+    }
+  }
+
+  void _updateSelectedIndex() {
+    final newIndex = _getIndexForRoute(widget.currentRoute);
+    if (_selectedIndex != newIndex) {
+      setState(() {
+        _selectedIndex = newIndex;
+      });
     }
   }
 
@@ -138,9 +155,9 @@ class _ResponsiveShellState extends ConsumerState<ResponsiveShell> {
 
   PreferredSizeWidget _buildAppBar(BuildContext context) {
     final theme = Theme.of(context);
-    
+
     return AppBar(
-      title: const Text('LeadX CRM'),
+      title: _buildHeaderTitle(context, compact: true),
       actions: [
         // Sync progress indicator (shows when syncing)
         const SyncProgressIndicator(),
@@ -325,11 +342,12 @@ class _ResponsiveShellState extends ConsumerState<ResponsiveShell> {
 
   Widget _buildNavigationRail(BuildContext context) {
     final theme = Theme.of(context);
-    
+    final isAdmin = ref.watch(isAdminProvider);
+
     // selectedIndex now directly matches _navItems since there's no "Add" button
     // Home(0), Customer(1), Activity(2), Profile(3)
     final effectiveIndex = _selectedIndex < 0 ? 0 : _selectedIndex;
-    
+
     // Build a fully scrollable custom navigation rail
     return Container(
       width: 80,
@@ -376,6 +394,13 @@ class _ResponsiveShellState extends ConsumerState<ResponsiveShell> {
                 ),
                 _buildRailTrailingItem(
                   context,
+                  icon: Icons.swap_horiz,
+                  label: 'Referral',
+                  isSelected: widget.currentRoute.contains('/referrals'),
+                  onTap: () => context.go(RoutePaths.referrals),
+                ),
+                _buildRailTrailingItem(
+                  context,
                   icon: Icons.leaderboard,
                   label: 'Score',
                   isSelected: widget.currentRoute.contains('/scoreboard'),
@@ -413,6 +438,16 @@ class _ResponsiveShellState extends ConsumerState<ResponsiveShell> {
                   isSelected: widget.currentRoute.contains('/notifications'),
                   onTap: () => context.push(RoutePaths.notifications),
                 ),
+                if (isAdmin) ...[
+                  const Divider(),
+                  _buildRailTrailingItem(
+                    context,
+                    icon: Icons.admin_panel_settings,
+                    label: 'Admin',
+                    isSelected: widget.currentRoute.contains('/admin'),
+                    onTap: () => context.push(RoutePaths.admin),
+                  ),
+                ],
                 const Spacer(),
                 const Divider(),
                 _buildRailTrailingItem(
@@ -433,7 +468,8 @@ class _ResponsiveShellState extends ConsumerState<ResponsiveShell> {
                   isSelected: widget.currentRoute.contains('/settings'),
                   onTap: () => context.push(RoutePaths.settings),
                 ),
-                const SizedBox(height: 16),
+                const SizedBox(height: 24),
+                const SizedBox(height: 8),
               ],
             ),
           ),
@@ -534,8 +570,7 @@ class _ResponsiveShellState extends ConsumerState<ResponsiveShell> {
   Widget _buildSidebar(BuildContext context) {
     final theme = Theme.of(context);
     final width = context.screenWidth >= Breakpoints.widescreen ? 280.0 : 256.0;
-    // TODO: Get actual admin status from auth provider
-    const bool isAdmin = false;
+    final isAdmin = ref.watch(isAdminProvider);
 
     return Container(
       width: width,
@@ -546,49 +581,40 @@ class _ResponsiveShellState extends ConsumerState<ResponsiveShell> {
           Container(
             padding: const EdgeInsets.all(16),
             child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
               children: [
-                Row(
-                  children: [
-                    Container(
-                      width: 48,
-                      height: 48,
-                      decoration: BoxDecoration(
-                        gradient: LinearGradient(
-                          begin: Alignment.topLeft,
-                          end: Alignment.bottomRight,
-                          colors: [
-                            theme.colorScheme.primary,
-                            theme.colorScheme.primaryContainer,
-                          ],
-                        ),
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      child: const Icon(
-                        Icons.auto_graph,
-                        color: Colors.white,
-                        size: 28,
-                      ),
-                    ),
-                    const SizedBox(width: 12),
-                    Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          'LeadX CRM',
-                          style: theme.textTheme.titleMedium?.copyWith(
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                        Text(
-                          'AI-Powered CRM',
-                          style: theme.textTheme.bodySmall?.copyWith(
-                            color: theme.colorScheme.onSurfaceVariant,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ],
+                Image.asset(
+                  'assets/images/logo.png',
+                  height: 64,
+                  width: 64,
+                  fit: BoxFit.contain,
+                  filterQuality: FilterQuality.high,
+                ),
+                const SizedBox(height: 12),
+                Text(
+                  'AI-Powered',
+                  style: theme.textTheme.labelLarge?.copyWith(
+                    fontWeight: FontWeight.w600,
+                  ),
+                  textAlign: TextAlign.center,
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  'Created by Corporate Transformation',
+                  style: theme.textTheme.labelSmall?.copyWith(
+                    color: theme.colorScheme.onSurfaceVariant,
+                    fontSize: 11,
+                  ),
+                  textAlign: TextAlign.center,
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  'Copyright @ 2025',
+                  style: theme.textTheme.labelSmall?.copyWith(
+                    color: theme.colorScheme.onSurfaceVariant,
+                    fontSize: 10,
+                  ),
+                  textAlign: TextAlign.center,
                 ),
               ],
             ),
@@ -615,6 +641,9 @@ class _ResponsiveShellState extends ConsumerState<ResponsiveShell> {
                 _buildSidebarItem(context, Icons.handshake, 'Broker', -1,
                     routePattern: '/brokers',
                     onTap: () => context.go(RoutePaths.brokers)),
+                _buildSidebarItem(context, Icons.swap_horiz, 'Referral', -1,
+                    routePattern: '/referrals',
+                    onTap: () => context.go(RoutePaths.referrals)),
 
                 // 4DX & PERFORMANCE
                 const SizedBox(height: 8),
@@ -662,16 +691,6 @@ class _ResponsiveShellState extends ConsumerState<ResponsiveShell> {
                       );
                     }),
               ],
-            ),
-          ),
-          // Footer
-          Container(
-            padding: const EdgeInsets.all(16),
-            child: Text(
-              '© 2025 LeadX',
-              style: theme.textTheme.bodySmall?.copyWith(
-                color: theme.colorScheme.onSurfaceVariant,
-              ),
             ),
           ),
         ],
@@ -844,60 +863,80 @@ class _ResponsiveShellState extends ConsumerState<ResponsiveShell> {
   }
 
   Widget _buildDrawer(BuildContext context) {
-    // TODO: Get actual user info from auth provider
-    return HomeDrawer(
-      userName: 'User Name',
-      userRole: 'Relationship Manager',
-      isAdmin: false, // TODO: Get from user role
-      onHvcTap: () {
-        Navigator.pop(context);
-        context.push(RoutePaths.hvc);
-      },
-      onBrokerTap: () {
-        Navigator.pop(context);
-        context.push(RoutePaths.brokers);
-      },
-      onScoreboardTap: () {
-        Navigator.pop(context);
-        context.push(RoutePaths.scoreboard);
-      },
-      onTargetsTap: () {
-        Navigator.pop(context);
-        context.push(RoutePaths.targets);
-      },
-      onCadenceTap: () {
-        Navigator.pop(context);
-        context.push(RoutePaths.cadence);
-      },
-      onReportsTap: () {
-        Navigator.pop(context);
-        // TODO: Add reports route when available
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Reports coming soon')),
+    return Consumer(
+      builder: (context, ref, _) {
+        final userAsync = ref.watch(currentUserProvider);
+        final isAdmin = ref.watch(isAdminProvider);
+
+        var userName = 'User Name';
+        var userRole = 'Relationship Manager';
+
+        userAsync.whenData((user) {
+          if (user != null) {
+            userName = user.displayName;
+            userRole = user.role.displayName;
+          }
+        });
+
+        return HomeDrawer(
+          userName: userName,
+          userRole: userRole,
+          isAdmin: isAdmin,
+          onHvcTap: () {
+            Navigator.pop(context);
+            context.push(RoutePaths.hvc);
+          },
+          onBrokerTap: () {
+            Navigator.pop(context);
+            context.push(RoutePaths.brokers);
+          },
+          onReferralsTap: () {
+            Navigator.pop(context);
+            context.push(RoutePaths.referrals);
+          },
+          onScoreboardTap: () {
+            Navigator.pop(context);
+            context.push(RoutePaths.scoreboard);
+          },
+          onTargetsTap: () {
+            Navigator.pop(context);
+            context.push(RoutePaths.targets);
+          },
+          onCadenceTap: () {
+            Navigator.pop(context);
+            context.push(RoutePaths.cadence);
+          },
+          onReportsTap: () {
+            Navigator.pop(context);
+            // TODO: Add reports route when available
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(content: Text('Reports coming soon')),
+            );
+          },
+          onNotificationsTap: () {
+            Navigator.pop(context);
+            context.push(RoutePaths.notifications);
+          },
+          onSettingsTap: () {
+            Navigator.pop(context);
+            context.push(RoutePaths.settings);
+          },
+          onHelpTap: () {
+            Navigator.pop(context);
+            // TODO: Add help route when available
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(content: Text('Help & FAQ coming soon')),
+            );
+          },
+          onAdminPanelTap: () {
+            Navigator.pop(context);
+            context.push(RoutePaths.admin);
+          },
+          onLogoutTap: () {
+            Navigator.pop(context);
+            context.go(RoutePaths.login);
+          },
         );
-      },
-      onNotificationsTap: () {
-        Navigator.pop(context);
-        context.push(RoutePaths.notifications);
-      },
-      onSettingsTap: () {
-        Navigator.pop(context);
-        context.push(RoutePaths.settings);
-      },
-      onHelpTap: () {
-        Navigator.pop(context);
-        // TODO: Add help route when available
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Help & FAQ coming soon')),
-        );
-      },
-      onAdminPanelTap: () {
-        Navigator.pop(context);
-        context.push(RoutePaths.admin);
-      },
-      onLogoutTap: () {
-        Navigator.pop(context);
-        context.go(RoutePaths.login);
       },
     );
   }
@@ -918,6 +957,100 @@ class _ResponsiveShellState extends ConsumerState<ResponsiveShell> {
       case 3:
         context.go(RoutePaths.profile);
         break;
+    }
+  }
+
+  Widget _buildHeaderTitle(BuildContext context, {bool compact = false}) {
+    final theme = Theme.of(context);
+
+    if (compact) {
+      // Mobile: logo + three text elements
+      return Row(
+        children: [
+          Image.asset(
+            'assets/images/logo.png',
+            height: 36,
+            width: 36,
+            fit: BoxFit.contain,
+            filterQuality: FilterQuality.high,
+          ),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'AI-Powered',
+                  style: theme.textTheme.labelMedium?.copyWith(
+                    fontWeight: FontWeight.w600,
+                  ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+                Text(
+                  'Created by Corporate',
+                  style: theme.textTheme.labelSmall?.copyWith(
+                    fontSize: 10,
+                    color: theme.colorScheme.onSurfaceVariant,
+                  ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+                Text(
+                  'Transformation',
+                  style: theme.textTheme.labelSmall?.copyWith(
+                    fontSize: 10,
+                    color: theme.colorScheme.onSurfaceVariant,
+                  ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ],
+            ),
+          ),
+        ],
+      );
+    } else {
+      // Desktop: logo + three text elements
+      return Row(
+        children: [
+          Image.asset(
+            'assets/images/logo.png',
+            height: 44,
+            width: 44,
+            fit: BoxFit.contain,
+            filterQuality: FilterQuality.high,
+          ),
+          const SizedBox(width: 12),
+          Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'AI-Powered',
+                style: theme.textTheme.labelLarge?.copyWith(
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+              Text(
+                'Created by Corporate Transformation',
+                style: theme.textTheme.labelSmall?.copyWith(
+                  color: theme.colorScheme.onSurfaceVariant,
+                  fontSize: 11,
+                ),
+              ),
+              Text(
+                'Copyright @ 2025',
+                style: theme.textTheme.labelSmall?.copyWith(
+                  color: theme.colorScheme.onSurfaceVariant,
+                  fontSize: 11,
+                ),
+              ),
+            ],
+          ),
+        ],
+      );
     }
   }
 }

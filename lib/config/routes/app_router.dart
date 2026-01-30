@@ -7,12 +7,16 @@ import '../../presentation/screens/activity/activity_calendar_screen.dart';
 import '../../presentation/screens/activity/activity_detail_screen.dart';
 import '../../presentation/screens/activity/activity_form_screen.dart';
 import '../../presentation/screens/admin/admin_home_screen.dart';
+import '../../presentation/screens/admin/master_data/master_data_form_screen.dart';
+import '../../presentation/screens/admin/master_data/master_data_list_screen.dart';
+import '../../presentation/screens/admin/master_data/master_data_menu_screen.dart';
 import '../../presentation/screens/admin/unauthorized_screen.dart';
 import '../../presentation/screens/admin/users/user_detail_screen.dart';
 import '../../presentation/screens/admin/users/user_form_screen.dart';
 import '../../presentation/screens/admin/users/user_list_screen.dart';
 import '../../presentation/screens/auth/forgot_password_screen.dart';
 import '../../presentation/screens/auth/login_screen.dart';
+import '../../presentation/screens/auth/reset_password_screen.dart';
 import '../../presentation/screens/auth/splash_screen.dart';
 import '../../presentation/screens/customer/customer_detail_screen.dart';
 import '../../presentation/screens/customer/customer_form_screen.dart';
@@ -31,10 +35,18 @@ import '../../presentation/screens/profile/about_screen.dart';
 import '../../presentation/screens/profile/change_password_screen.dart';
 import '../../presentation/screens/profile/edit_profile_screen.dart';
 import '../../presentation/screens/profile/settings_screen.dart';
+import '../../presentation/screens/referral/manager_approval_screen.dart';
+import '../../presentation/screens/referral/referral_create_screen.dart';
+import '../../presentation/screens/referral/referral_detail_screen.dart';
+import '../../presentation/screens/referral/referral_list_screen.dart';
 import '../../presentation/screens/scoreboard/scoreboard_screen.dart';
 import '../../presentation/screens/sync/sync_queue_screen.dart';
 import '../../presentation/widgets/shell/responsive_shell.dart';
 import 'route_names.dart';
+
+/// Root navigator key for routes that should NOT be wrapped by the shell.
+/// Detail screens, form screens, etc. use this to render full-screen without bottom nav.
+final _rootNavigatorKey = GlobalKey<NavigatorState>(debugLabel: 'root');
 
 /// Stores the intended location when user navigates directly via URL bar
 /// This is used to restore the location after authentication check completes
@@ -56,6 +68,7 @@ final appRouterProvider = Provider<GoRouter>((ref) {
   final authState = ref.watch(authStateProvider);
 
   return GoRouter(
+    navigatorKey: _rootNavigatorKey,
     initialLocation: RoutePaths.splash,
     debugLogDiagnostics: true,
     
@@ -69,16 +82,30 @@ final appRouterProvider = Provider<GoRouter>((ref) {
         ),
         orElse: () => false,
       );
+      final isPasswordRecovery = authState.maybeWhen(
+        data: (auth) => auth.maybeWhen(
+          passwordRecovery: () => true,
+          orElse: () => false,
+        ),
+        orElse: () => false,
+      );
 
       final currentLocation = state.matchedLocation;
       final fullUri = state.uri.toString();
       final isSplash = currentLocation == RoutePaths.splash;
       final isLogin = currentLocation == RoutePaths.login;
       final isForgotPassword = currentLocation == RoutePaths.forgotPassword;
-      final isAuthPage = isSplash || isLogin || isForgotPassword;
+      final isResetPassword = currentLocation == RoutePaths.resetPassword;
+      final isAuthPage = isSplash || isLogin || isForgotPassword || isResetPassword;
+
+      // Password recovery flow - redirect to reset password screen
+      if (isPasswordRecovery && !isResetPassword) {
+        return RoutePaths.resetPassword;
+      }
 
       // Still loading - save intended location and redirect to splash
-      if (isLoading) {
+      // Exception: Don't redirect away from reset-password - it handles its own auth check
+      if (isLoading && !isResetPassword) {
         // Only save the deep link if it's not an auth page
         if (!isAuthPage && _pendingDeepLink == null) {
           _pendingDeepLink = fullUri;
@@ -94,7 +121,8 @@ final appRouterProvider = Provider<GoRouter>((ref) {
       }
 
       // Logged in but on login/splash - check for pending deep link first
-      if (isLoggedIn && (isLogin || isSplash)) {
+      // Note: Don't redirect away from reset-password - user needs to set new password
+      if (isLoggedIn && (isLogin || isSplash) && !isResetPassword) {
         final pendingLink = _pendingDeepLink;
         _pendingDeepLink = null; // Clear pending link after use
         
@@ -130,6 +158,11 @@ final appRouterProvider = Provider<GoRouter>((ref) {
         path: RoutePaths.forgotPassword,
         name: RouteNames.forgotPassword,
         builder: (context, state) => const ForgotPasswordScreen(),
+      ),
+      GoRoute(
+        path: RoutePaths.resetPassword,
+        name: RouteNames.resetPassword,
+        builder: (context, state) => const ResetPasswordScreen(),
       ),
 
       // ============================================
@@ -174,42 +207,34 @@ final appRouterProvider = Provider<GoRouter>((ref) {
               GoRoute(
                 path: 'create',
                 name: RouteNames.customerCreate,
-                builder: (context, state) => ResponsiveShell(
-                  currentRoute: state.matchedLocation,
-                  child: const CustomerFormScreen(),
-                ),
+                parentNavigatorKey: _rootNavigatorKey,
+                builder: (context, state) => const CustomerFormScreen(),
               ),
               GoRoute(
                 path: ':id',
                 name: RouteNames.customerDetail,
+                parentNavigatorKey: _rootNavigatorKey,
                 builder: (context, state) {
                   final id = state.pathParameters['id']!;
-                  return ResponsiveShell(
-                    currentRoute: state.matchedLocation,
-                    child: CustomerDetailScreen(customerId: id),
-                  );
+                  return CustomerDetailScreen(customerId: id);
                 },
                 routes: [
                   GoRoute(
                     path: 'edit',
                     name: RouteNames.customerEdit,
+                    parentNavigatorKey: _rootNavigatorKey,
                     builder: (context, state) {
                       final id = state.pathParameters['id']!;
-                      return ResponsiveShell(
-                        currentRoute: state.matchedLocation,
-                        child: CustomerFormScreen(customerId: id),
-                      );
+                      return CustomerFormScreen(customerId: id);
                     },
                   ),
                   GoRoute(
                     path: 'history',
                     name: 'customerHistory',
+                    parentNavigatorKey: _rootNavigatorKey,
                     builder: (context, state) {
                       final id = state.pathParameters['id']!;
-                      return ResponsiveShell(
-                        currentRoute: state.matchedLocation,
-                        child: CustomerHistoryScreen(customerId: id),
-                      );
+                      return CustomerHistoryScreen(customerId: id);
                     },
                   ),
                 ],
@@ -221,47 +246,39 @@ final appRouterProvider = Provider<GoRouter>((ref) {
           GoRoute(
             path: 'pipelines/new',
             name: RouteNames.pipelineCreate,
+            parentNavigatorKey: _rootNavigatorKey,
             builder: (context, state) {
               final customerId = state.uri.queryParameters['customerId']!;
-              return ResponsiveShell(
-                currentRoute: state.matchedLocation,
-                child: PipelineFormScreen(customerId: customerId),
-              );
+              return PipelineFormScreen(customerId: customerId);
             },
           ),
           GoRoute(
             path: 'pipelines/:id',
             name: RouteNames.pipelineDetail,
+            parentNavigatorKey: _rootNavigatorKey,
             builder: (context, state) {
               final id = state.pathParameters['id']!;
               final customerId = state.uri.queryParameters['customerId'] ?? '';
-              return ResponsiveShell(
-                currentRoute: state.matchedLocation,
-                child: PipelineDetailScreen(pipelineId: id, customerId: customerId),
-              );
+              return PipelineDetailScreen(pipelineId: id, customerId: customerId);
             },
             routes: [
               GoRoute(
                 path: 'edit',
                 name: RouteNames.pipelineEdit,
+                parentNavigatorKey: _rootNavigatorKey,
                 builder: (context, state) {
                   final id = state.pathParameters['id']!;
                   final customerId = state.uri.queryParameters['customerId'] ?? '';
-                  return ResponsiveShell(
-                    currentRoute: state.matchedLocation,
-                    child: PipelineFormScreen(customerId: customerId, pipelineId: id),
-                  );
+                  return PipelineFormScreen(customerId: customerId, pipelineId: id);
                 },
               ),
               GoRoute(
                 path: 'history',
                 name: 'pipelineHistory',
+                parentNavigatorKey: _rootNavigatorKey,
                 builder: (context, state) {
                   final id = state.pathParameters['id']!;
-                  return ResponsiveShell(
-                    currentRoute: state.matchedLocation,
-                    child: PipelineHistoryScreen(pipelineId: id),
-                  );
+                  return PipelineHistoryScreen(pipelineId: id);
                 },
               ),
             ],
@@ -281,19 +298,17 @@ final appRouterProvider = Provider<GoRouter>((ref) {
               GoRoute(
                 path: 'create',
                 name: RouteNames.activityCreate,
+                parentNavigatorKey: _rootNavigatorKey,
                 builder: (context, state) {
                   final objectType = state.uri.queryParameters['objectType'];
                   final objectId = state.uri.queryParameters['objectId'];
                   final objectName = state.uri.queryParameters['objectName'];
                   final immediate = state.uri.queryParameters['immediate'] == 'true';
-                  return ResponsiveShell(
-                    currentRoute: state.matchedLocation,
-                    child: ActivityFormScreen(
-                      objectType: objectType,
-                      objectId: objectId,
-                      objectName: objectName,
-                      isImmediate: immediate,
-                    ),
+                  return ActivityFormScreen(
+                    objectType: objectType,
+                    objectId: objectId,
+                    objectName: objectName,
+                    isImmediate: immediate,
                   );
                 },
               ),
@@ -301,30 +316,26 @@ final appRouterProvider = Provider<GoRouter>((ref) {
               GoRoute(
                 path: 'immediate',
                 name: 'activityImmediate',
+                parentNavigatorKey: _rootNavigatorKey,
                 builder: (context, state) {
                   final objectType = state.uri.queryParameters['objectType'];
                   final objectId = state.uri.queryParameters['objectId'];
                   final objectName = state.uri.queryParameters['objectName'];
-                  return ResponsiveShell(
-                    currentRoute: state.matchedLocation,
-                    child: ActivityFormScreen(
-                      objectType: objectType,
-                      objectId: objectId,
-                      objectName: objectName,
-                      isImmediate: true,
-                    ),
+                  return ActivityFormScreen(
+                    objectType: objectType,
+                    objectId: objectId,
+                    objectName: objectName,
+                    isImmediate: true,
                   );
                 },
               ),
               GoRoute(
                 path: ':id',
                 name: RouteNames.activityDetail,
+                parentNavigatorKey: _rootNavigatorKey,
                 builder: (context, state) {
                   final id = state.pathParameters['id']!;
-                  return ResponsiveShell(
-                    currentRoute: state.matchedLocation,
-                    child: ActivityDetailScreen(activityId: id),
-                  );
+                  return ActivityDetailScreen(activityId: id);
                 },
               ),
             ],
@@ -354,31 +365,25 @@ final appRouterProvider = Provider<GoRouter>((ref) {
               GoRoute(
                 path: 'new',
                 name: RouteNames.hvcCreate,
-                builder: (context, state) => ResponsiveShell(
-                  currentRoute: state.matchedLocation,
-                  child: const HvcFormScreen(),
-                ),
+                parentNavigatorKey: _rootNavigatorKey,
+                builder: (context, state) => const HvcFormScreen(),
               ),
               GoRoute(
                 path: ':id',
                 name: RouteNames.hvcDetail,
+                parentNavigatorKey: _rootNavigatorKey,
                 builder: (context, state) {
                   final id = state.pathParameters['id']!;
-                  return ResponsiveShell(
-                    currentRoute: state.matchedLocation,
-                    child: HvcDetailScreen(hvcId: id),
-                  );
+                  return HvcDetailScreen(hvcId: id);
                 },
                 routes: [
                   GoRoute(
                     path: 'edit',
                     name: RouteNames.hvcEdit,
+                    parentNavigatorKey: _rootNavigatorKey,
                     builder: (context, state) {
                       final id = state.pathParameters['id']!;
-                      return ResponsiveShell(
-                        currentRoute: state.matchedLocation,
-                        child: HvcFormScreen(hvcId: id),
-                      );
+                      return HvcFormScreen(hvcId: id);
                     },
                   ),
                 ],
@@ -400,34 +405,63 @@ final appRouterProvider = Provider<GoRouter>((ref) {
               GoRoute(
                 path: 'new',
                 name: RouteNames.brokerCreate,
-                builder: (context, state) => ResponsiveShell(
-                  currentRoute: state.matchedLocation,
-                  child: const BrokerFormScreen(),
-                ),
+                parentNavigatorKey: _rootNavigatorKey,
+                builder: (context, state) => const BrokerFormScreen(),
               ),
               GoRoute(
                 path: ':id',
                 name: RouteNames.brokerDetail,
+                parentNavigatorKey: _rootNavigatorKey,
                 builder: (context, state) {
                   final id = state.pathParameters['id']!;
-                  return ResponsiveShell(
-                    currentRoute: state.matchedLocation,
-                    child: BrokerDetailScreen(brokerId: id),
-                  );
+                  return BrokerDetailScreen(brokerId: id);
                 },
                 routes: [
                   GoRoute(
                     path: 'edit',
                     name: RouteNames.brokerEdit,
+                    parentNavigatorKey: _rootNavigatorKey,
                     builder: (context, state) {
                       final id = state.pathParameters['id']!;
-                      return ResponsiveShell(
-                        currentRoute: state.matchedLocation,
-                        child: BrokerFormScreen(brokerId: id),
-                      );
+                      return BrokerFormScreen(brokerId: id);
                     },
                   ),
                 ],
+              ),
+            ],
+          ),
+
+          // Referrals
+          GoRoute(
+            path: 'referrals',
+            name: RouteNames.referrals,
+            pageBuilder: (context, state) => NoTransitionPage(
+              child: ResponsiveShell(
+                currentRoute: state.matchedLocation,
+                child: const ReferralListScreen(),
+              ),
+            ),
+            routes: [
+              GoRoute(
+                path: 'new',
+                name: RouteNames.referralCreate,
+                parentNavigatorKey: _rootNavigatorKey,
+                builder: (context, state) => const ReferralCreateScreen(),
+              ),
+              GoRoute(
+                path: 'approvals',
+                name: RouteNames.managerApprovals,
+                parentNavigatorKey: _rootNavigatorKey,
+                builder: (context, state) => const ManagerApprovalScreen(),
+              ),
+              GoRoute(
+                path: ':id',
+                name: RouteNames.referralDetail,
+                parentNavigatorKey: _rootNavigatorKey,
+                builder: (context, state) {
+                  final id = state.pathParameters['id']!;
+                  return ReferralDetailScreen(referralId: id);
+                },
               ),
             ],
           ),
@@ -486,18 +520,14 @@ final appRouterProvider = Provider<GoRouter>((ref) {
               GoRoute(
                 path: 'edit',
                 name: RouteNames.editProfile,
-                builder: (context, state) => ResponsiveShell(
-                  currentRoute: state.matchedLocation,
-                  child: const EditProfileScreen(),
-                ),
+                parentNavigatorKey: _rootNavigatorKey,
+                builder: (context, state) => const EditProfileScreen(),
               ),
               GoRoute(
                 path: 'change-password',
                 name: RouteNames.changePassword,
-                builder: (context, state) => ResponsiveShell(
-                  currentRoute: state.matchedLocation,
-                  child: const ChangePasswordScreen(),
-                ),
+                parentNavigatorKey: _rootNavigatorKey,
+                builder: (context, state) => const ChangePasswordScreen(),
               ),
             ],
           ),
@@ -581,31 +611,25 @@ final appRouterProvider = Provider<GoRouter>((ref) {
               GoRoute(
                 path: 'create',
                 name: RouteNames.adminUserCreate,
-                builder: (context, state) => ResponsiveShell(
-                  currentRoute: state.matchedLocation,
-                  child: const UserFormScreen(),
-                ),
+                parentNavigatorKey: _rootNavigatorKey,
+                builder: (context, state) => const UserFormScreen(),
               ),
               GoRoute(
                 path: ':id',
                 name: RouteNames.adminUserDetail,
+                parentNavigatorKey: _rootNavigatorKey,
                 builder: (context, state) {
                   final id = state.pathParameters['id']!;
-                  return ResponsiveShell(
-                    currentRoute: state.matchedLocation,
-                    child: UserDetailScreen(userId: id),
-                  );
+                  return UserDetailScreen(userId: id);
                 },
                 routes: [
                   GoRoute(
                     path: 'edit',
                     name: RouteNames.adminUserEdit,
+                    parentNavigatorKey: _rootNavigatorKey,
                     builder: (context, state) {
                       final id = state.pathParameters['id']!;
-                      return ResponsiveShell(
-                        currentRoute: state.matchedLocation,
-                        child: UserFormScreen(userId: id),
-                      );
+                      return UserFormScreen(userId: id);
                     },
                   ),
                 ],
@@ -613,18 +637,42 @@ final appRouterProvider = Provider<GoRouter>((ref) {
             ],
           ),
 
-          // Master Data Management (placeholders for Phase 3)
+          // Master Data Management
           GoRoute(
             path: 'master-data',
             name: RouteNames.adminMasterData,
             pageBuilder: (context, state) => NoTransitionPage(
               child: ResponsiveShell(
                 currentRoute: state.matchedLocation,
-                child: const Placeholder(
-                  child: Center(child: Text('Master Data Management')),
-                ),
+                child: const MasterDataMenuScreen(),
               ),
             ),
+            routes: [
+              GoRoute(
+                path: ':entityType',
+                name: RouteNames.adminMasterDataList,
+                parentNavigatorKey: _rootNavigatorKey,
+                builder: (context, state) {
+                  final entityType = state.pathParameters['entityType']!;
+                  return MasterDataListScreen(entityType: entityType);
+                },
+                routes: [
+                  GoRoute(
+                    path: 'create',
+                    name: RouteNames.adminMasterDataCreate,
+                    parentNavigatorKey: _rootNavigatorKey,
+                    builder: (context, state) {
+                      final entityType = state.pathParameters['entityType']!;
+                      final id = state.uri.queryParameters['id'];
+                      return MasterDataFormScreen(
+                        entityType: entityType,
+                        itemId: id,
+                      );
+                    },
+                  ),
+                ],
+              ),
+            ],
           ),
 
           // 4DX Configuration (placeholders for Phase 4)
