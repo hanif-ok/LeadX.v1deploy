@@ -113,18 +113,18 @@ final brokerActivitiesProvider =
 // Detail Providers
 // ==========================================
 
-/// Provider for fetching a specific activity by ID.
+/// Provider for watching a specific activity by ID (reactive stream).
 final activityDetailProvider =
-    FutureProvider.family<domain.Activity?, String>((ref, id) async {
+    StreamProvider.family<domain.Activity?, String>((ref, id) {
   final repository = ref.watch(activityRepositoryProvider);
-  return repository.getActivityById(id);
+  return repository.watchActivityById(id);
 });
 
-/// Provider for fetching activity with full details (type, photos, logs).
+/// Provider for watching activity with full details (type, photos, logs) (reactive stream).
 final activityWithDetailsProvider =
-    FutureProvider.family<domain.ActivityWithDetails?, String>((ref, id) async {
+    StreamProvider.family<domain.ActivityWithDetails?, String>((ref, id) {
   final repository = ref.watch(activityRepositoryProvider);
-  return repository.getActivityWithDetails(id);
+  return repository.watchActivityWithDetails(id);
 });
 
 // ==========================================
@@ -201,10 +201,13 @@ class ActivityFormNotifier extends StateNotifier<ActivityFormState> {
         isLoading: false,
         errorMessage: failure.message,
       ),
-      (activity) => state = state.copyWith(
-        isLoading: false,
-        savedActivity: activity,
-      ),
+      (activity) {
+        state = state.copyWith(
+          isLoading: false,
+          savedActivity: activity,
+        );
+        // No invalidation needed - StreamProviders auto-update from Drift
+      },
     );
   }
 
@@ -217,10 +220,13 @@ class ActivityFormNotifier extends StateNotifier<ActivityFormState> {
         isLoading: false,
         errorMessage: failure.message,
       ),
-      (activity) => state = state.copyWith(
-        isLoading: false,
-        savedActivity: activity,
-      ),
+      (activity) {
+        state = state.copyWith(
+          isLoading: false,
+          savedActivity: activity,
+        );
+        // No invalidation needed - StreamProviders auto-update from Drift
+      },
     );
   }
 
@@ -233,10 +239,13 @@ class ActivityFormNotifier extends StateNotifier<ActivityFormState> {
         isLoading: false,
         errorMessage: failure.message,
       ),
-      (activity) => state = state.copyWith(
-        isLoading: false,
-        savedActivity: activity,
-      ),
+      (activity) {
+        state = state.copyWith(
+          isLoading: false,
+          savedActivity: activity,
+        );
+        // No invalidation needed - StreamProviders auto-update from Drift
+      },
     );
   }
 
@@ -249,15 +258,18 @@ class ActivityFormNotifier extends StateNotifier<ActivityFormState> {
         isLoading: false,
         errorMessage: failure.message,
       ),
-      (activity) => state = state.copyWith(
-        isLoading: false,
-        savedActivity: activity,
-      ),
+      (activity) {
+        state = state.copyWith(
+          isLoading: false,
+          savedActivity: activity,
+        );
+        // No invalidation needed - StreamProviders auto-update from Drift
+      },
     );
   }
 
   /// Cancel an activity.
-  Future<bool> cancelActivity(String id, String reason) async {
+  Future<bool> cancelActivity(String id, String reason, {String? customerId, String? hvcId, String? brokerId}) async {
     state = state.copyWith(isLoading: true, errorMessage: null);
     final result = await _repository.cancelActivity(id, reason);
     return result.fold(
@@ -270,6 +282,7 @@ class ActivityFormNotifier extends StateNotifier<ActivityFormState> {
       },
       (_) {
         state = state.copyWith(isLoading: false);
+        // No invalidation needed - StreamProviders auto-update from Drift
         return true;
       },
     );

@@ -1,7 +1,7 @@
 import 'dart:async';
 
 import 'package:connectivity_plus/connectivity_plus.dart';
-import 'package:flutter/foundation.dart' show kIsWeb;
+import 'package:flutter/foundation.dart' show kIsWeb, debugPrint;
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 /// Service for monitoring network connectivity.
@@ -22,7 +22,9 @@ class ConnectivityService {
   StreamSubscription<List<ConnectivityResult>>? _subscription;
   Timer? _pollTimer;
   bool _isConnected;
-  
+  bool _isInitialized = false;
+  Completer<void>? _initCompleter;
+
   /// Polling interval for connectivity checks (30 seconds).
   static const Duration _pollInterval = Duration(seconds: 30);
 
@@ -30,33 +32,51 @@ class ConnectivityService {
   Stream<bool> get connectivityStream =>
       _controller?.stream ?? const Stream.empty();
 
+  /// Whether the service has been initialized.
+  bool get isInitialized => _isInitialized;
+
   /// Current connectivity status.
   bool get isConnected => _isConnected;
 
   /// Check if device is currently offline.
   bool get isOffline => !_isConnected;
 
+  /// Ensure the service is initialized. Safe to call multiple times.
+  Future<void> ensureInitialized() async {
+    if (_isInitialized) return;
+    if (_initCompleter != null) {
+      return _initCompleter!.future;
+    }
+    return initialize();
+  }
+
   /// Initialize the connectivity service.
   Future<void> initialize() async {
+    if (_isInitialized) return;
+    if (_initCompleter != null) {
+      return _initCompleter!.future;
+    }
+
+    _initCompleter = Completer<void>();
     _controller = StreamController<bool>.broadcast();
 
     // Get initial connectivity status from platform
     final results = await _connectivity.checkConnectivity();
     final hasInterface = _hasConnection(results);
 
-    print('[ConnectivityService] Initial connectivity check: results=$results, hasInterface=$hasInterface, kIsWeb=$kIsWeb');
+    debugPrint('[ConnectivityService] Initial connectivity check: results=$results, hasInterface=$hasInterface, kIsWeb=$kIsWeb');
 
     // On web, connectivity_plus has limited support
     // If we're on web, assume we're online (since the app is running in a browser)
     if (kIsWeb) {
       _isConnected = true;
-      print('[ConnectivityService] Web platform detected, assuming online');
+      debugPrint('[ConnectivityService] Web platform detected, assuming online');
     } else if (hasInterface) {
       // On mobile, having a network interface doesn't mean we have internet
       // Verify by actually trying to reach the server
-      print('[ConnectivityService] Verifying server reachability...');
+      debugPrint('[ConnectivityService] Verifying server reachability...');
       _isConnected = await checkServerReachability();
-      print('[ConnectivityService] Server reachable: $_isConnected');
+      debugPrint('[ConnectivityService] Server reachable: $_isConnected');
     } else {
       _isConnected = false;
     }
@@ -75,11 +95,11 @@ class ConnectivityService {
 
       // On mobile, verify actual server reachability when interface becomes available
       if (!kIsWeb && connected && !_isConnected) {
-        print('[ConnectivityService] Interface available, verifying reachability...');
+        debugPrint('[ConnectivityService] Interface available, verifying reachability...');
         connected = await checkServerReachability();
       }
 
-      print('[ConnectivityService] Connectivity changed: results=$results, connected=$connected');
+      debugPrint('[ConnectivityService] Connectivity changed: results=$results, connected=$connected');
 
       if (connected != _isConnected) {
         _isConnected = connected;
@@ -91,6 +111,9 @@ class ConnectivityService {
     if (!kIsWeb) {
       _startPeriodicPolling();
     }
+
+    _isInitialized = true;
+    _initCompleter?.complete();
   }
 
   /// Start periodic connectivity polling.
@@ -104,7 +127,7 @@ class ConnectivityService {
       final connected = hasInterface && await checkServerReachability();
 
       if (connected != _isConnected) {
-        print('[ConnectivityService] Poll detected change: $connected (interface: $hasInterface)');
+        debugPrint('[ConnectivityService] Poll detected change: $connected (interface: $hasInterface)');
         _isConnected = connected;
         _controller?.add(_isConnected);
       }

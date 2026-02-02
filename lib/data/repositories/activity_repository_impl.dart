@@ -86,6 +86,36 @@ class ActivityRepositoryImpl implements ActivityRepository {
     });
   }
 
+  @override
+  Stream<domain.Activity?> watchActivityById(String id) {
+    return _localDataSource.watchActivityById(id).asyncMap((data) async {
+      if (data == null) return null;
+      await _ensureCachesLoaded();
+      return _mapToActivity(data);
+    });
+  }
+
+  @override
+  Stream<domain.ActivityWithDetails?> watchActivityWithDetails(String id) {
+    // Combine activity, photos, and audit logs streams into a single reactive stream
+    return _localDataSource.watchActivityById(id).asyncMap((data) async {
+      if (data == null) return null;
+      await _ensureCachesLoaded();
+
+      final activity = _mapToActivity(data);
+      final typeData = await _localDataSource.getActivityTypeById(data.activityTypeId);
+      final photos = await _localDataSource.getActivityPhotos(id);
+      final logs = await _localDataSource.getAuditLogs(id);
+
+      return domain.ActivityWithDetails(
+        activity: activity,
+        activityType: typeData != null ? _mapToActivityType(typeData) : null,
+        photos: photos.map(_mapToActivityPhoto).toList(),
+        auditLogs: logs.map(_mapToAuditLog).toList(),
+      );
+    });
+  }
+
   // ==========================================
   // Get Operations
   // ==========================================
@@ -678,34 +708,35 @@ class ActivityRepositoryImpl implements ActivityRepository {
       final remoteData = await _remoteDataSource.fetchActivities(since: since);
 
       if (remoteData.isEmpty) {
-        print('[ActivityRepo] No activities to sync from remote');
+        debugPrint('[ActivityRepo] No activities to sync from remote');
         return;
       }
 
-      print('[ActivityRepo] Syncing ${remoteData.length} activities from remote');
+      debugPrint('[ActivityRepo] Syncing ${remoteData.length} activities from remote');
 
       final companions = remoteData.map((data) {
+        // Handle potentially null fields with defaults
         return db.ActivitiesCompanion(
           id: Value(data['id'] as String),
-          userId: Value(data['user_id'] as String),
-          createdBy: Value(data['created_by'] as String),
-          objectType: Value(data['object_type'] as String),
-          activityTypeId: Value(data['activity_type_id'] as String),
+          userId: Value(data['user_id'] as String? ?? ''),
+          createdBy: Value(data['created_by'] as String? ?? ''),
+          objectType: Value(data['object_type'] as String? ?? 'CUSTOMER'),
+          activityTypeId: Value(data['activity_type_id'] as String? ?? ''),
           scheduledDatetime: Value(DateTime.parse(data['scheduled_datetime'] as String)),
           customerId: Value(data['customer_id'] as String?),
           hvcId: Value(data['hvc_id'] as String?),
           brokerId: Value(data['broker_id'] as String?),
           summary: Value(data['summary'] as String?),
           notes: Value(data['notes'] as String?),
-          status: Value(data['status'] as String),
+          status: Value(data['status'] as String? ?? 'PLANNED'),
           isImmediate: Value(data['is_immediate'] as bool? ?? false),
           executedAt: data['executed_at'] != null
               ? Value(DateTime.parse(data['executed_at'] as String))
               : const Value(null),
-          latitude: Value(data['latitude'] as double?),
-          longitude: Value(data['longitude'] as double?),
-          locationAccuracy: Value(data['location_accuracy'] as double?),
-          distanceFromTarget: Value(data['distance_from_target'] as double?),
+          latitude: Value((data['latitude'] as num?)?.toDouble()),
+          longitude: Value((data['longitude'] as num?)?.toDouble()),
+          locationAccuracy: Value((data['location_accuracy'] as num?)?.toDouble()),
+          distanceFromTarget: Value((data['distance_from_target'] as num?)?.toDouble()),
           isLocationOverride: Value(data['is_location_override'] as bool? ?? false),
           overrideReason: Value(data['override_reason'] as String?),
           rescheduledFromId: Value(data['rescheduled_from_id'] as String?),
@@ -725,9 +756,9 @@ class ActivityRepositoryImpl implements ActivityRepository {
       }).toList();
 
       await _localDataSource.upsertActivities(companions);
-      print('[ActivityRepo] Successfully synced ${companions.length} activities');
+      debugPrint('[ActivityRepo] Successfully synced ${companions.length} activities');
     } catch (e) {
-      print('[ActivityRepo] Error syncing from remote: $e');
+      debugPrint('[ActivityRepo] Error syncing from remote: $e');
       rethrow;
     }
   }
@@ -798,17 +829,17 @@ class ActivityRepositoryImpl implements ActivityRepository {
       final pendingPhotos = await _localDataSource.getPendingUploadPhotos();
       
       if (pendingPhotos.isEmpty) {
-        print('[ActivityRepo] No pending photos to upload');
+        debugPrint('[ActivityRepo] No pending photos to upload');
         return;
       }
 
-      print('[ActivityRepo] Uploading ${pendingPhotos.length} pending photos');
+      debugPrint('[ActivityRepo] Uploading ${pendingPhotos.length} pending photos');
 
       for (final photo in pendingPhotos) {
         try {
           // Skip if no local path
           if (photo.localPath == null || photo.localPath!.isEmpty) {
-            print('[ActivityRepo] Skipping photo ${photo.id}: no local path');
+            debugPrint('[ActivityRepo] Skipping photo ${photo.id}: no local path');
             continue;
           }
 
@@ -834,16 +865,16 @@ class ActivityRepositoryImpl implements ActivityRepository {
           // Mark as uploaded locally
           await _localDataSource.markPhotoAsUploaded(photo.id, photoUrl);
 
-          print('[ActivityRepo] Uploaded photo ${photo.id} -> $photoUrl');
+          debugPrint('[ActivityRepo] Uploaded photo ${photo.id} -> $photoUrl');
         } catch (e) {
-          print('[ActivityRepo] Failed to upload photo ${photo.id}: $e');
+          debugPrint('[ActivityRepo] Failed to upload photo ${photo.id}: $e');
           // Continue with next photo, don't fail entire batch
         }
       }
 
-      print('[ActivityRepo] Photo sync completed');
+      debugPrint('[ActivityRepo] Photo sync completed');
     } catch (e) {
-      print('[ActivityRepo] Error syncing photos: $e');
+      debugPrint('[ActivityRepo] Error syncing photos: $e');
       rethrow;
     }
   }

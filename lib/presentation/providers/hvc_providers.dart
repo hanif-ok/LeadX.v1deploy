@@ -72,11 +72,11 @@ final hvcSearchProvider = FutureProvider.family
 // HVC Detail Providers
 // ==========================================
 
-/// Provider for fetching a single HVC by ID.
+/// Provider for watching a single HVC by ID (reactive stream).
 final hvcDetailProvider =
-    FutureProvider.family<domain.Hvc?, String>((ref, id) async {
+    StreamProvider.family<domain.Hvc?, String>((ref, id) {
   final repository = ref.watch(hvcRepositoryProvider);
-  return repository.getHvcById(id);
+  return repository.watchHvcById(id);
 });
 
 /// @deprecated Use [hvcTypesStreamProvider] from master_data_providers instead.
@@ -86,11 +86,11 @@ final hvcTypesProvider = FutureProvider<List<domain.HvcType>>((ref) async {
   return repository.getHvcTypes();
 });
 
-/// Provider for fetching key persons of an HVC.
+/// Provider for watching key persons of an HVC (reactive stream).
 final hvcKeyPersonsProvider =
-    FutureProvider.family<List<domain.KeyPerson>, String>((ref, hvcId) async {
+    StreamProvider.family<List<domain.KeyPerson>, String>((ref, hvcId) {
   final repository = ref.watch(hvcRepositoryProvider);
-  return repository.getHvcKeyPersons(hvcId);
+  return repository.watchHvcKeyPersons(hvcId);
 });
 
 // ==========================================
@@ -111,12 +111,11 @@ final customerHvcsProvider = StreamProvider.family<
   return repository.watchCustomerHvcs(customerId);
 });
 
-/// Provider for linked customer count of an HVC.
+/// Provider for linked customer count of an HVC (derived from existing stream).
 final linkedCustomerCountProvider =
-    FutureProvider.family<int, String>((ref, hvcId) async {
+    StreamProvider.family<int, String>((ref, hvcId) {
   final repository = ref.watch(hvcRepositoryProvider);
-  final links = await repository.getLinkedCustomers(hvcId);
-  return links.length;
+  return repository.watchLinkedCustomers(hvcId).map((links) => links.length);
 });
 
 // ==========================================
@@ -164,10 +163,13 @@ class HvcFormNotifier extends StateNotifier<HvcFormState> {
         isLoading: false,
         errorMessage: failure.message,
       ),
-      (hvc) => state = state.copyWith(
-        isLoading: false,
-        savedHvc: hvc,
-      ),
+      (hvc) {
+        state = state.copyWith(
+          isLoading: false,
+          savedHvc: hvc,
+        );
+        // No invalidation needed - StreamProviders auto-update from Drift
+      },
     );
   }
 
@@ -182,10 +184,13 @@ class HvcFormNotifier extends StateNotifier<HvcFormState> {
         isLoading: false,
         errorMessage: failure.message,
       ),
-      (hvc) => state = state.copyWith(
-        isLoading: false,
-        savedHvc: hvc,
-      ),
+      (hvc) {
+        state = state.copyWith(
+          isLoading: false,
+          savedHvc: hvc,
+        );
+        // No invalidation needed - StreamProviders auto-update from Drift
+      },
     );
   }
 
@@ -205,6 +210,7 @@ class HvcFormNotifier extends StateNotifier<HvcFormState> {
       },
       (_) {
         state = state.copyWith(isLoading: false);
+        // No invalidation needed - StreamProviders auto-update from Drift
         return true;
       },
     );
@@ -268,15 +274,18 @@ class CustomerHvcLinkNotifier extends StateNotifier<CustomerHvcLinkState> {
         isLoading: false,
         errorMessage: failure.message,
       ),
-      (link) => state = state.copyWith(
-        isLoading: false,
-        savedLink: link,
-      ),
+      (link) {
+        state = state.copyWith(
+          isLoading: false,
+          savedLink: link,
+        );
+        // No invalidation needed - StreamProviders auto-update from Drift
+      },
     );
   }
 
   /// Unlink customer from HVC.
-  Future<bool> unlinkCustomerFromHvc(String linkId) async {
+  Future<bool> unlinkCustomerFromHvc(String linkId, {required String hvcId, required String customerId}) async {
     state = state.copyWith(isLoading: true);
 
     final result = await _repository.unlinkCustomerFromHvc(linkId);
@@ -291,6 +300,7 @@ class CustomerHvcLinkNotifier extends StateNotifier<CustomerHvcLinkState> {
       },
       (_) {
         state = state.copyWith(isLoading: false);
+        // No invalidation needed - StreamProviders auto-update from Drift
         return true;
       },
     );

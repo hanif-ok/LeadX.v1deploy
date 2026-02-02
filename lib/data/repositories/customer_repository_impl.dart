@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:dartz/dartz.dart';
+import 'package:flutter/foundation.dart';
 import 'package:drift/drift.dart';
 import 'package:uuid/uuid.dart';
 
@@ -53,6 +54,12 @@ class CustomerRepositoryImpl implements CustomerRepository {
           );
 
   @override
+  Stream<domain.Customer?> watchCustomerById(String id) =>
+      _localDataSource.watchCustomerById(id).map(
+            (data) => data != null ? _mapToCustomer(data) : null,
+          );
+
+  @override
   Future<domain.Customer?> getCustomerById(String id) async {
     final data = await _localDataSource.getCustomerById(id);
     return data != null ? _mapToCustomer(data) : null;
@@ -94,18 +101,18 @@ class CustomerRepositoryImpl implements CustomerRepository {
       );
 
       // Save locally first
-      print('[CustomerRepo] Inserting customer locally: $id');
+      debugPrint('[CustomerRepo] Inserting customer locally: $id');
       await _localDataSource.insertCustomer(companion);
 
       // Queue for sync
-      print('[CustomerRepo] Queueing customer for sync: $id');
+      debugPrint('[CustomerRepo] Queueing customer for sync: $id');
       await _syncService.queueOperation(
         entityType: SyncEntityType.customer,
         entityId: id,
         operation: SyncOperation.create,
         payload: _createSyncPayload(id, code, dto, now),
       );
-      print('[CustomerRepo] Customer queued successfully');
+      debugPrint('[CustomerRepo] Customer queued successfully');
 
       // Trigger sync to upload immediately
       unawaited(_syncService.triggerSync());
@@ -261,6 +268,18 @@ class CustomerRepositoryImpl implements CustomerRepository {
   }
 
   @override
+  Stream<List<domain.KeyPerson>> watchCustomerKeyPersons(String customerId) =>
+      _keyPersonLocalDataSource.watchKeyPersonsByCustomer(customerId).map(
+            (keyPersons) => keyPersons.map(_mapToKeyPerson).toList(),
+          );
+
+  @override
+  Stream<domain.KeyPerson?> watchPrimaryKeyPerson(String customerId) =>
+      _keyPersonLocalDataSource.watchPrimaryKeyPerson(customerId).map(
+            (data) => data != null ? _mapToKeyPerson(data) : null,
+          );
+
+  @override
   Future<Either<Failure, domain.KeyPerson>> addKeyPerson(
     KeyPersonDto dto,
   ) async {
@@ -406,35 +425,40 @@ class CustomerRepositoryImpl implements CustomerRepository {
   @override
   Future<Either<Failure, int>> syncFromRemote({DateTime? since}) async {
     try {
+      debugPrint('[CustomerRepo] syncFromRemote called, currentUserId=$_currentUserId, since=$since');
       final remoteData = await _remoteDataSource.fetchCustomers(since: since);
+      debugPrint('[CustomerRepo] fetchCustomers returned ${remoteData.length} records');
 
       if (remoteData.isEmpty) {
+        debugPrint('[CustomerRepo] No customers returned from remote - check RLS policies if unexpected');
         return const Right(0);
       }
 
       final companions = remoteData.map((data) {
+        // Handle potentially null fields - some customers may have null values
+        // for fields that are required locally, so we provide empty defaults
         return db.CustomersCompanion(
           id: Value(data['id'] as String),
           code: Value(data['code'] as String),
-          name: Value(data['name'] as String),
-          address: Value(data['address'] as String),
-          provinceId: Value(data['province_id'] as String),
-          cityId: Value(data['city_id'] as String),
+          name: Value(data['name'] as String? ?? ''),
+          address: Value(data['address'] as String? ?? ''),
+          provinceId: Value(data['province_id'] as String? ?? ''),
+          cityId: Value(data['city_id'] as String? ?? ''),
           postalCode: Value(data['postal_code'] as String?),
-          latitude: Value(data['latitude'] as double?),
-          longitude: Value(data['longitude'] as double?),
+          latitude: Value((data['latitude'] as num?)?.toDouble()),
+          longitude: Value((data['longitude'] as num?)?.toDouble()),
           phone: Value(data['phone'] as String?),
           email: Value(data['email'] as String?),
           website: Value(data['website'] as String?),
-          companyTypeId: Value(data['company_type_id'] as String),
-          ownershipTypeId: Value(data['ownership_type_id'] as String),
-          industryId: Value(data['industry_id'] as String),
+          companyTypeId: Value(data['company_type_id'] as String? ?? ''),
+          ownershipTypeId: Value(data['ownership_type_id'] as String? ?? ''),
+          industryId: Value(data['industry_id'] as String? ?? ''),
           npwp: Value(data['npwp'] as String?),
-          assignedRmId: Value(data['assigned_rm_id'] as String),
+          assignedRmId: Value(data['assigned_rm_id'] as String? ?? ''),
           imageUrl: Value(data['image_url'] as String?),
           notes: Value(data['notes'] as String?),
           isActive: Value(data['is_active'] as bool? ?? true),
-          createdBy: Value(data['created_by'] as String),
+          createdBy: Value(data['created_by'] as String? ?? ''),
           isPendingSync: const Value(false),
           createdAt: Value(DateTime.parse(data['created_at'] as String)),
           updatedAt: Value(DateTime.parse(data['updated_at'] as String)),
@@ -465,7 +489,7 @@ class CustomerRepositoryImpl implements CustomerRepository {
         return const Right(0);
       }
 
-      print('[CustomerRepo] Syncing ${remoteData.length} key persons from remote');
+      debugPrint('[CustomerRepo] Syncing ${remoteData.length} key persons from remote');
 
       final companions = remoteData.map((data) {
         return db.KeyPersonsCompanion(

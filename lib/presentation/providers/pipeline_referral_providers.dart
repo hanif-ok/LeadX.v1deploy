@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../data/datasources/local/pipeline_referral_local_data_source.dart';
@@ -46,6 +47,7 @@ final pipelineReferralRepositoryProvider =
     remoteDataSource: remoteDataSource,
     syncService: syncService,
     currentUserId: currentUser?.id ?? '',
+    currentUserRole: currentUser?.role.name.toUpperCase() ?? '',
     database: database,
   );
 });
@@ -93,6 +95,20 @@ final pendingApprovalsProvider =
   return repository.watchPendingApprovals(currentUser.id);
 });
 
+/// Provider for watching all referrals (for admin users).
+final allReferralsProvider =
+    StreamProvider.autoDispose<List<PipelineReferral>>((ref) {
+  final repository = ref.watch(pipelineReferralRepositoryProvider);
+  final currentUser = ref.watch(currentUserProvider).valueOrNull;
+
+  // Only admins can see all referrals
+  if (currentUser == null || !currentUser.isAdmin) {
+    return Stream.value([]);
+  }
+
+  return repository.watchAllReferrals();
+});
+
 /// Provider for watching inbound referrals for a specific user.
 final userInboundReferralsProvider = StreamProvider.autoDispose
     .family<List<PipelineReferral>, String>((ref, userId) {
@@ -111,11 +127,11 @@ final userOutboundReferralsProvider = StreamProvider.autoDispose
 // Detail Provider
 // ==========================================
 
-/// Provider for fetching a specific referral by ID.
-final referralDetailProvider = FutureProvider.autoDispose
-    .family<PipelineReferral?, String>((ref, id) async {
+/// Provider for watching a specific referral by ID (reactive stream).
+final referralDetailProvider = StreamProvider.autoDispose
+    .family<PipelineReferral?, String>((ref, id) {
   final repository = ref.watch(pipelineReferralRepositoryProvider);
-  return repository.getReferralById(id);
+  return repository.watchReferralById(id);
 });
 
 // ==========================================
@@ -194,6 +210,16 @@ class ReferralActionNotifier extends StateNotifier<ReferralActionState> {
   Future<bool> createReferral(PipelineReferralCreateDto dto) async {
     state = state.copyWith(isLoading: true, errorMessage: null);
     final result = await _repository.createReferral(dto);
+
+    // Check if notifier is still mounted - if not, the operation still succeeded
+    // but we can't update state. Return based on result, not mounted status.
+    final isSuccess = result.isRight();
+
+    if (!mounted) {
+      debugPrint('[ReferralNotifier] Notifier unmounted, but operation ${isSuccess ? "succeeded" : "failed"}');
+      return isSuccess;
+    }
+
     return result.fold(
       (failure) {
         state = state.copyWith(
@@ -207,6 +233,7 @@ class ReferralActionNotifier extends StateNotifier<ReferralActionState> {
           isLoading: false,
           result: referral,
         );
+        // No invalidation needed - StreamProviders auto-update from Drift
         return true;
       },
     );
@@ -216,6 +243,16 @@ class ReferralActionNotifier extends StateNotifier<ReferralActionState> {
   Future<bool> acceptReferral(String id, {String? notes}) async {
     state = state.copyWith(isLoading: true, errorMessage: null);
     final result = await _repository.acceptReferral(id, notes);
+
+    // Check if notifier is still mounted - if not, the operation still succeeded
+    // but we can't update state. Return based on result, not mounted status.
+    final isSuccess = result.isRight();
+
+    if (!mounted) {
+      debugPrint('[ReferralNotifier] acceptReferral: Notifier unmounted, but operation ${isSuccess ? "succeeded" : "failed"}');
+      return isSuccess;
+    }
+
     return result.fold(
       (failure) {
         state = state.copyWith(
@@ -229,6 +266,7 @@ class ReferralActionNotifier extends StateNotifier<ReferralActionState> {
           isLoading: false,
           result: referral,
         );
+        // No invalidation needed - StreamProviders auto-update from Drift
         return true;
       },
     );
@@ -238,6 +276,14 @@ class ReferralActionNotifier extends StateNotifier<ReferralActionState> {
   Future<bool> rejectReferral(String id, String reason) async {
     state = state.copyWith(isLoading: true, errorMessage: null);
     final result = await _repository.rejectReferral(id, reason);
+
+    final isSuccess = result.isRight();
+
+    if (!mounted) {
+      debugPrint('[ReferralNotifier] rejectReferral: Notifier unmounted, but operation ${isSuccess ? "succeeded" : "failed"}');
+      return isSuccess;
+    }
+
     return result.fold(
       (failure) {
         state = state.copyWith(
@@ -251,6 +297,7 @@ class ReferralActionNotifier extends StateNotifier<ReferralActionState> {
           isLoading: false,
           result: referral,
         );
+        // No invalidation needed - StreamProviders auto-update from Drift
         return true;
       },
     );
@@ -260,6 +307,14 @@ class ReferralActionNotifier extends StateNotifier<ReferralActionState> {
   Future<bool> approveReferral(String id, {String? notes}) async {
     state = state.copyWith(isLoading: true, errorMessage: null);
     final result = await _repository.approveReferral(id, _currentUserId, notes);
+
+    final isSuccess = result.isRight();
+
+    if (!mounted) {
+      debugPrint('[ReferralNotifier] approveReferral: Notifier unmounted, but operation ${isSuccess ? "succeeded" : "failed"}');
+      return isSuccess;
+    }
+
     return result.fold(
       (failure) {
         state = state.copyWith(
@@ -273,6 +328,7 @@ class ReferralActionNotifier extends StateNotifier<ReferralActionState> {
           isLoading: false,
           result: referral,
         );
+        // No invalidation needed - StreamProviders auto-update from Drift
         return true;
       },
     );
@@ -283,6 +339,14 @@ class ReferralActionNotifier extends StateNotifier<ReferralActionState> {
     state = state.copyWith(isLoading: true, errorMessage: null);
     final result =
         await _repository.rejectAsManager(id, _currentUserId, reason);
+
+    final isSuccess = result.isRight();
+
+    if (!mounted) {
+      debugPrint('[ReferralNotifier] rejectAsManager: Notifier unmounted, but operation ${isSuccess ? "succeeded" : "failed"}');
+      return isSuccess;
+    }
+
     return result.fold(
       (failure) {
         state = state.copyWith(
@@ -296,6 +360,7 @@ class ReferralActionNotifier extends StateNotifier<ReferralActionState> {
           isLoading: false,
           result: referral,
         );
+        // No invalidation needed - StreamProviders auto-update from Drift
         return true;
       },
     );
@@ -305,6 +370,14 @@ class ReferralActionNotifier extends StateNotifier<ReferralActionState> {
   Future<bool> cancelReferral(String id, String reason) async {
     state = state.copyWith(isLoading: true, errorMessage: null);
     final result = await _repository.cancelReferral(id, reason);
+
+    final isSuccess = result.isRight();
+
+    if (!mounted) {
+      debugPrint('[ReferralNotifier] cancelReferral: Notifier unmounted, but operation ${isSuccess ? "succeeded" : "failed"}');
+      return isSuccess;
+    }
+
     return result.fold(
       (failure) {
         state = state.copyWith(
@@ -318,6 +391,7 @@ class ReferralActionNotifier extends StateNotifier<ReferralActionState> {
           isLoading: false,
           result: referral,
         );
+        // No invalidation needed - StreamProviders auto-update from Drift
         return true;
       },
     );
@@ -427,6 +501,7 @@ class CreateReferralFormNotifier extends StateNotifier<CreateReferralFormState> 
 
     // Fetch approver for the receiver
     final approver = await _repository.findApproverForUser(id);
+    if (!mounted) return;
     state = state.copyWith(
       approverInfo: approver,
       isLoadingApprover: false,

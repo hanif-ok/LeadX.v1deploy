@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 /// Remote data source for customer operations via Supabase.
@@ -9,6 +10,9 @@ class CustomerRemoteDataSource {
   /// Fetch all customers, optionally filtered by updatedAt for incremental sync.
   /// Returns raw JSON data from Supabase.
   Future<List<Map<String, dynamic>>> fetchCustomers({DateTime? since}) async {
+    debugPrint('[CustomerRemoteDS] fetchCustomers called, since=$since');
+    debugPrint('[CustomerRemoteDS] auth.uid=${_client.auth.currentUser?.id}');
+
     var query = _client.from('customers').select();
 
     if (since != null) {
@@ -16,6 +20,7 @@ class CustomerRemoteDataSource {
     }
 
     final response = await query.order('updated_at', ascending: true);
+    debugPrint('[CustomerRemoteDS] Query returned ${response.length} customers');
     return List<Map<String, dynamic>>.from(response);
   }
 

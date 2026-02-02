@@ -67,25 +67,25 @@ final brokerSearchProvider = FutureProvider.autoDispose
 // Detail Providers
 // ==========================================
 
-/// Provider for fetching a single broker by ID.
+/// Provider for watching a single broker by ID (reactive stream).
 final brokerDetailProvider =
-    FutureProvider.family<domain.Broker?, String>((ref, id) async {
+    StreamProvider.family<domain.Broker?, String>((ref, id) {
   final repository = ref.watch(brokerRepositoryProvider);
-  return repository.getBrokerById(id);
+  return repository.watchBrokerById(id);
 });
 
-/// Provider for broker key persons (PICs).
+/// Provider for watching broker key persons (PICs) (reactive stream).
 final brokerKeyPersonsProvider =
-    FutureProvider.family<List<domain.KeyPerson>, String>((ref, brokerId) async {
+    StreamProvider.family<List<domain.KeyPerson>, String>((ref, brokerId) {
   final repository = ref.watch(brokerRepositoryProvider);
-  return repository.getBrokerKeyPersons(brokerId);
+  return repository.watchBrokerKeyPersons(brokerId);
 });
 
-/// Provider for broker pipeline count.
+/// Provider for watching broker pipeline count (reactive stream).
 final brokerPipelineCountProvider =
-    FutureProvider.family<int, String>((ref, brokerId) async {
+    StreamProvider.family<int, String>((ref, brokerId) {
   final repository = ref.watch(brokerRepositoryProvider);
-  return repository.getBrokerPipelineCount(brokerId);
+  return repository.watchBrokerPipelineCount(brokerId);
 });
 
 // ==========================================
@@ -133,10 +133,13 @@ class BrokerFormNotifier extends StateNotifier<BrokerFormState> {
         isLoading: false,
         errorMessage: failure.message,
       ),
-      (broker) => state = state.copyWith(
-        isLoading: false,
-        savedBroker: broker,
-      ),
+      (broker) {
+        state = state.copyWith(
+          isLoading: false,
+          savedBroker: broker,
+        );
+        // No invalidation needed - StreamProviders auto-update from Drift
+      },
     );
   }
 
@@ -150,10 +153,13 @@ class BrokerFormNotifier extends StateNotifier<BrokerFormState> {
         isLoading: false,
         errorMessage: failure.message,
       ),
-      (broker) => state = state.copyWith(
-        isLoading: false,
-        savedBroker: broker,
-      ),
+      (broker) {
+        state = state.copyWith(
+          isLoading: false,
+          savedBroker: broker,
+        );
+        // No invalidation needed - StreamProviders auto-update from Drift
+      },
     );
   }
 
@@ -167,7 +173,10 @@ class BrokerFormNotifier extends StateNotifier<BrokerFormState> {
         isLoading: false,
         errorMessage: failure.message,
       ),
-      (_) => state = state.copyWith(isLoading: false),
+      (_) {
+        state = state.copyWith(isLoading: false);
+        // No invalidation needed - StreamProviders auto-update from Drift
+      },
     );
   }
 

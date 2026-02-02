@@ -20,6 +20,9 @@ abstract class PipelineReferralRepository {
   /// Get a specific referral by ID.
   Future<PipelineReferral?> getReferralById(String id);
 
+  /// Watch a specific referral by ID (reactive stream).
+  Stream<PipelineReferral?> watchReferralById(String id);
+
   // ==========================================
   // Receiver Actions
   // ==========================================
@@ -83,6 +86,9 @@ abstract class PipelineReferralRepository {
   /// Returns referrals where current user is the designated approver.
   Stream<List<PipelineReferral>> watchPendingApprovals(String managerId);
 
+  /// Watch all referrals (for admin users).
+  Stream<List<PipelineReferral>> watchAllReferrals();
+
   // ==========================================
   // List Operations
   // ==========================================
@@ -125,4 +131,12 @@ abstract class PipelineReferralRepository {
 
   /// Mark a referral as synced.
   Future<void> markAsSynced(String id, DateTime syncedAt);
+
+  // ==========================================
+  // Cache Operations
+  // ==========================================
+
+  /// Invalidate all lookup caches.
+  /// Call this after sync to refresh user/customer/branch names.
+  void invalidateCaches();
 }

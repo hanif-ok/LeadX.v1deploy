@@ -74,22 +74,22 @@ final customerPipelinesProvider =
   return repository.watchCustomerPipelines(customerId);
 });
 
-/// Provider for fetching pipelines where a broker is the source.
+/// Provider for watching pipelines where a broker is the source (reactive stream).
 final brokerPipelinesProvider =
-    FutureProvider.family<List<domain.Pipeline>, String>((ref, brokerId) async {
+    StreamProvider.family<List<domain.Pipeline>, String>((ref, brokerId) {
   final repository = ref.watch(pipelineRepositoryProvider);
-  return repository.getBrokerPipelines(brokerId);
+  return repository.watchBrokerPipelines(brokerId);
 });
 
 // ==========================================
 // Detail Providers
 // ==========================================
 
-/// Provider for fetching a specific pipeline by ID.
+/// Provider for watching a specific pipeline by ID (reactive stream).
 final pipelineDetailProvider =
-    FutureProvider.family<domain.Pipeline?, String>((ref, id) async {
+    StreamProvider.family<domain.Pipeline?, String>((ref, id) {
   final repository = ref.watch(pipelineRepositoryProvider);
-  return repository.getPipelineById(id);
+  return repository.watchPipelineById(id);
 });
 
 // ==========================================
@@ -155,10 +155,13 @@ class PipelineFormNotifier extends StateNotifier<PipelineFormState> {
         isLoading: false,
         errorMessage: failure.message,
       ),
-      (pipeline) => state = state.copyWith(
-        isLoading: false,
-        savedPipeline: pipeline,
-      ),
+      (pipeline) {
+        state = state.copyWith(
+          isLoading: false,
+          savedPipeline: pipeline,
+        );
+        // No invalidation needed - StreamProviders auto-update from Drift
+      },
     );
   }
 
@@ -171,10 +174,13 @@ class PipelineFormNotifier extends StateNotifier<PipelineFormState> {
         isLoading: false,
         errorMessage: failure.message,
       ),
-      (pipeline) => state = state.copyWith(
-        isLoading: false,
-        savedPipeline: pipeline,
-      ),
+      (pipeline) {
+        state = state.copyWith(
+          isLoading: false,
+          savedPipeline: pipeline,
+        );
+        // No invalidation needed - StreamProviders auto-update from Drift
+      },
     );
   }
 
@@ -187,10 +193,13 @@ class PipelineFormNotifier extends StateNotifier<PipelineFormState> {
         isLoading: false,
         errorMessage: failure.message,
       ),
-      (pipeline) => state = state.copyWith(
-        isLoading: false,
-        savedPipeline: pipeline,
-      ),
+      (pipeline) {
+        state = state.copyWith(
+          isLoading: false,
+          savedPipeline: pipeline,
+        );
+        // No invalidation needed - StreamProviders auto-update from Drift
+      },
     );
   }
 
@@ -203,15 +212,18 @@ class PipelineFormNotifier extends StateNotifier<PipelineFormState> {
         isLoading: false,
         errorMessage: failure.message,
       ),
-      (pipeline) => state = state.copyWith(
-        isLoading: false,
-        savedPipeline: pipeline,
-      ),
+      (pipeline) {
+        state = state.copyWith(
+          isLoading: false,
+          savedPipeline: pipeline,
+        );
+        // No invalidation needed - StreamProviders auto-update from Drift
+      },
     );
   }
 
   /// Delete a pipeline.
-  Future<bool> deletePipeline(String id) async {
+  Future<bool> deletePipeline(String id, {String? customerId, String? brokerId}) async {
     state = state.copyWith(isLoading: true, errorMessage: null);
     final result = await _repository.deletePipeline(id);
     return result.fold(
@@ -224,6 +236,7 @@ class PipelineFormNotifier extends StateNotifier<PipelineFormState> {
       },
       (_) {
         state = state.copyWith(isLoading: false);
+        // No invalidation needed - StreamProviders auto-update from Drift
         return true;
       },
     );

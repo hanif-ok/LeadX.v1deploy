@@ -89,25 +89,25 @@ final customerSearchProvider = FutureProvider.family
 // Customer Detail Providers
 // ==========================================
 
-/// Provider for fetching a single customer by ID.
+/// Provider for watching a single customer by ID (reactive stream).
 final customerDetailProvider =
-    FutureProvider.family<domain.Customer?, String>((ref, id) async {
+    StreamProvider.family<domain.Customer?, String>((ref, id) {
   final repository = ref.watch(customerRepositoryProvider);
-  return repository.getCustomerById(id);
+  return repository.watchCustomerById(id);
 });
 
-/// Provider for fetching key persons of a customer.
+/// Provider for watching key persons of a customer (reactive stream).
 final customerKeyPersonsProvider =
-    FutureProvider.family<List<domain.KeyPerson>, String>((ref, customerId) async {
+    StreamProvider.family<List<domain.KeyPerson>, String>((ref, customerId) {
   final repository = ref.watch(customerRepositoryProvider);
-  return repository.getCustomerKeyPersons(customerId);
+  return repository.watchCustomerKeyPersons(customerId);
 });
 
-/// Provider for the primary key person of a customer.
+/// Provider for watching the primary key person of a customer (reactive stream).
 final primaryKeyPersonProvider =
-    FutureProvider.family<domain.KeyPerson?, String>((ref, customerId) async {
+    StreamProvider.family<domain.KeyPerson?, String>((ref, customerId) {
   final repository = ref.watch(customerRepositoryProvider);
-  return repository.getPrimaryKeyPerson(customerId);
+  return repository.watchPrimaryKeyPerson(customerId);
 });
 
 // ==========================================
@@ -156,10 +156,13 @@ class CustomerFormNotifier extends StateNotifier<CustomerFormState> {
         isLoading: false,
         errorMessage: failure.message,
       ),
-      (customer) => state = state.copyWith(
-        isLoading: false,
-        savedCustomer: customer,
-      ),
+      (customer) {
+        state = state.copyWith(
+          isLoading: false,
+          savedCustomer: customer,
+        );
+        // No invalidation needed - StreamProviders auto-update from Drift
+      },
     );
   }
 
@@ -175,10 +178,13 @@ class CustomerFormNotifier extends StateNotifier<CustomerFormState> {
         isLoading: false,
         errorMessage: failure.message,
       ),
-      (customer) => state = state.copyWith(
-        isLoading: false,
-        savedCustomer: customer,
-      ),
+      (customer) {
+        state = state.copyWith(
+          isLoading: false,
+          savedCustomer: customer,
+        );
+        // No invalidation needed - StreamProviders auto-update from Drift
+      },
     );
   }
 
@@ -241,10 +247,13 @@ class KeyPersonFormNotifier extends StateNotifier<KeyPersonFormState> {
         isLoading: false,
         errorMessage: failure.message,
       ),
-      (keyPerson) => state = state.copyWith(
-        isLoading: false,
-        savedKeyPerson: keyPerson,
-      ),
+      (keyPerson) {
+        state = state.copyWith(
+          isLoading: false,
+          savedKeyPerson: keyPerson,
+        );
+        // No invalidation needed - StreamProviders auto-update from Drift
+      },
     );
   }
 
@@ -259,15 +268,18 @@ class KeyPersonFormNotifier extends StateNotifier<KeyPersonFormState> {
         isLoading: false,
         errorMessage: failure.message,
       ),
-      (keyPerson) => state = state.copyWith(
-        isLoading: false,
-        savedKeyPerson: keyPerson,
-      ),
+      (keyPerson) {
+        state = state.copyWith(
+          isLoading: false,
+          savedKeyPerson: keyPerson,
+        );
+        // No invalidation needed - StreamProviders auto-update from Drift
+      },
     );
   }
 
   /// Delete a key person.
-  Future<void> deleteKeyPerson(String id) async {
+  Future<void> deleteKeyPerson(String id, {String? customerId}) async {
     state = state.copyWith(isLoading: true);
 
     final result = await _repository.deleteKeyPerson(id);
@@ -277,7 +289,10 @@ class KeyPersonFormNotifier extends StateNotifier<KeyPersonFormState> {
         isLoading: false,
         errorMessage: failure.message,
       ),
-      (_) => state = state.copyWith(isLoading: false),
+      (_) {
+        state = state.copyWith(isLoading: false);
+        // No invalidation needed - StreamProviders auto-update from Drift
+      },
     );
   }
 

@@ -742,7 +742,7 @@ class _SupervisorNameProviderElement
   String? get userId => (origin as SupervisorNameProvider).userId;
 }
 
-String _$adminUserNotifierHash() => r'a983f9825ccacd6738914afa11751662415c5c81';
+String _$adminUserNotifierHash() => r'a42fed89bee9ddb180d6f00f73b1cd66ee3e56c3';
 
 /// State for user management operations.
 ///
