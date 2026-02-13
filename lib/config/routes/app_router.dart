@@ -7,6 +7,11 @@ import '../../presentation/screens/activity/activity_calendar_screen.dart';
 import '../../presentation/screens/activity/activity_detail_screen.dart';
 import '../../presentation/screens/activity/activity_form_screen.dart';
 import '../../presentation/screens/admin/admin_home_screen.dart';
+import '../../presentation/screens/admin/4dx/admin_4dx_home_screen.dart';
+import '../../presentation/screens/admin/4dx/measures/admin_measure_list_screen.dart';
+import '../../presentation/screens/admin/4dx/measures/admin_measure_form_screen.dart';
+import '../../presentation/screens/admin/4dx/periods/admin_period_list_screen.dart';
+import '../../presentation/screens/admin/4dx/periods/admin_period_form_screen.dart';
 import '../../presentation/screens/admin/master_data/master_data_form_screen.dart';
 import '../../presentation/screens/admin/master_data/master_data_list_screen.dart';
 import '../../presentation/screens/admin/master_data/master_data_menu_screen.dart';
@@ -41,7 +46,14 @@ import '../../presentation/screens/referral/manager_approval_screen.dart';
 import '../../presentation/screens/referral/referral_create_screen.dart';
 import '../../presentation/screens/referral/referral_detail_screen.dart';
 import '../../presentation/screens/referral/referral_list_screen.dart';
+import '../../presentation/screens/admin/4dx/targets/admin_target_list_screen.dart';
+import '../../presentation/screens/admin/4dx/targets/admin_target_form_screen.dart';
+import '../../presentation/screens/team_targets/team_target_list_screen.dart';
+import '../../presentation/screens/team_targets/team_target_form_screen.dart';
+import '../../presentation/screens/scoreboard/leaderboard_screen.dart';
+import '../../presentation/screens/scoreboard/my_targets_screen.dart';
 import '../../presentation/screens/scoreboard/scoreboard_screen.dart';
+import '../../presentation/screens/scoreboard/measure_detail_screen.dart';
 import '../../presentation/screens/sync/sync_queue_screen.dart';
 import '../../presentation/screens/cadence/cadence_list_screen.dart';
 import '../../presentation/screens/cadence/cadence_detail_screen.dart';
@@ -49,6 +61,7 @@ import '../../presentation/screens/cadence/cadence_form_screen.dart';
 import '../../presentation/screens/cadence/host_dashboard_screen.dart';
 import '../../presentation/widgets/shell/responsive_shell.dart';
 import '../../domain/entities/cadence.dart';
+import '../../domain/entities/scoring_entities.dart';
 import 'route_names.dart';
 
 /// Root navigator key for routes that should NOT be wrapped by the shell.
@@ -483,6 +496,27 @@ final appRouterProvider = Provider<GoRouter>((ref) {
                 child: const ScoreboardScreen(),
               ),
             ),
+            routes: [
+              // Leaderboard
+              GoRoute(
+                path: 'leaderboard',
+                name: RouteNames.leaderboard,
+                pageBuilder: (context, state) => const MaterialPage(
+                  child: LeaderboardScreen(),
+                ),
+              ),
+              // Measure Detail
+              GoRoute(
+                path: 'measure/:measureId',
+                name: RouteNames.measureDetail,
+                pageBuilder: (context, state) {
+                  final measureId = state.pathParameters['measureId']!;
+                  return MaterialPage(
+                    child: MeasureDetailScreen(measureId: measureId),
+                  );
+                },
+              ),
+            ],
           ),
 
           // Cadence
@@ -529,18 +563,43 @@ final appRouterProvider = Provider<GoRouter>((ref) {
             ],
           ),
 
-          // Targets
+          // Targets (My Targets - user-facing)
           GoRoute(
             path: 'targets',
             name: RouteNames.targets,
             pageBuilder: (context, state) => NoTransitionPage(
               child: ResponsiveShell(
                 currentRoute: state.matchedLocation,
-                child: const Placeholder(
-                  child: Center(child: Text('Targets')),
-                ),
+                child: const MyTargetsScreen(),
               ),
             ),
+          ),
+
+          // Team Targets (Manager-facing: BH/BM/ROH assign subordinate targets)
+          GoRoute(
+            path: 'team-targets',
+            name: RouteNames.teamTargets,
+            pageBuilder: (context, state) => NoTransitionPage(
+              child: ResponsiveShell(
+                currentRoute: state.matchedLocation,
+                child: const TeamTargetListScreen(),
+              ),
+            ),
+            routes: [
+              GoRoute(
+                path: ':userId',
+                name: RouteNames.teamTargetForm,
+                parentNavigatorKey: _rootNavigatorKey,
+                builder: (context, state) {
+                  final userId = state.pathParameters['userId']!;
+                  final period = state.extra! as ScoringPeriod;
+                  return TeamTargetFormScreen(
+                    userId: userId,
+                    period: period,
+                  );
+                },
+              ),
+            ],
           ),
 
           // Profile (tab route)
@@ -712,18 +771,106 @@ final appRouterProvider = Provider<GoRouter>((ref) {
             ],
           ),
 
-          // 4DX Configuration (placeholders for Phase 4)
+          // 4DX Configuration
           GoRoute(
             path: '4dx',
             name: RouteNames.admin4dx,
             pageBuilder: (context, state) => NoTransitionPage(
               child: ResponsiveShell(
                 currentRoute: state.matchedLocation,
-                child: const Placeholder(
-                  child: Center(child: Text('4DX Configuration')),
-                ),
+                child: const Admin4DXHomeScreen(),
               ),
             ),
+            routes: [
+              // Measures List
+              GoRoute(
+                path: 'measures',
+                name: RouteNames.adminMeasures,
+                pageBuilder: (context, state) => NoTransitionPage(
+                  child: ResponsiveShell(
+                    currentRoute: state.matchedLocation,
+                    child: const AdminMeasureListScreen(),
+                  ),
+                ),
+                routes: [
+                  // Create Measure
+                  GoRoute(
+                    path: 'create',
+                    name: RouteNames.adminMeasureCreate,
+                    parentNavigatorKey: _rootNavigatorKey,
+                    builder: (context, state) => const AdminMeasureFormScreen(),
+                  ),
+                  // Edit Measure
+                  GoRoute(
+                    path: ':id',
+                    name: RouteNames.adminMeasureEdit,
+                    parentNavigatorKey: _rootNavigatorKey,
+                    builder: (context, state) {
+                      final id = state.pathParameters['id']!;
+                      return AdminMeasureFormScreen(measureId: id);
+                    },
+                  ),
+                ],
+              ),
+              // Periods List
+              GoRoute(
+                path: 'periods',
+                name: RouteNames.adminPeriods,
+                pageBuilder: (context, state) => NoTransitionPage(
+                  child: ResponsiveShell(
+                    currentRoute: state.matchedLocation,
+                    child: const AdminPeriodListScreen(),
+                  ),
+                ),
+                routes: [
+                  // Create Period
+                  GoRoute(
+                    path: 'create',
+                    name: RouteNames.adminPeriodCreate,
+                    parentNavigatorKey: _rootNavigatorKey,
+                    builder: (context, state) =>
+                        const AdminPeriodFormScreen(),
+                  ),
+                  // Edit Period
+                  GoRoute(
+                    path: ':id',
+                    name: RouteNames.adminPeriodEdit,
+                    parentNavigatorKey: _rootNavigatorKey,
+                    builder: (context, state) {
+                      final id = state.pathParameters['id']!;
+                      return AdminPeriodFormScreen(periodId: id);
+                    },
+                  ),
+                ],
+              ),
+              // Targets Management
+              GoRoute(
+                path: 'targets',
+                name: RouteNames.adminTargets,
+                pageBuilder: (context, state) => NoTransitionPage(
+                  child: ResponsiveShell(
+                    currentRoute: state.matchedLocation,
+                    child: const AdminTargetListScreen(),
+                  ),
+                ),
+                routes: [
+                  // User Target Form
+                  GoRoute(
+                    path: ':userId',
+                    name: RouteNames.adminTargetForm,
+                    parentNavigatorKey: _rootNavigatorKey,
+                    builder: (context, state) {
+                      final userId = state.pathParameters['userId']!;
+                      final period = state.extra! as ScoringPeriod;
+                      return AdminTargetFormScreen(
+                        userId: userId,
+                        period: period,
+                      );
+                    },
+                  ),
+                ],
+              ),
+            ],
           ),
 
           // Cadence Management

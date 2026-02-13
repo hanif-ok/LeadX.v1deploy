@@ -324,16 +324,16 @@ class ScoreboardNotifier extends _$ScoreboardNotifier {
         currentUser.id,
         currentPeriodData.id,
       );
-      final leadScores = await repository.getUserScoresByType(
-        currentUser.id,
-        currentPeriodData.id,
-        'LEAD',
-      );
-      final lagScores = await repository.getUserScoresByType(
-        currentUser.id,
-        currentPeriodData.id,
-        'LAG',
-      );
+
+      // Use multi-period method: fetches scores from each measure's
+      // own current period, then split by measureType
+      final allScores =
+          await repository.getUserScoresForCurrentPeriods(currentUser.id);
+      final leadScores =
+          allScores.where((s) => s.measureType == 'LEAD').toList();
+      final lagScores =
+          allScores.where((s) => s.measureType == 'LAG').toList();
+
       final leaderboardData =
           await repository.getLeaderboard(currentPeriodData.id);
 
@@ -365,16 +365,33 @@ class ScoreboardNotifier extends _$ScoreboardNotifier {
         currentUser.id,
         period.id,
       );
-      final leadScores = await repository.getUserScoresByType(
-        currentUser.id,
-        period.id,
-        'LEAD',
-      );
-      final lagScores = await repository.getUserScoresByType(
-        currentUser.id,
-        period.id,
-        'LAG',
-      );
+
+      List<UserScore> leadScores;
+      List<UserScore> lagScores;
+
+      if (period.isCurrent) {
+        // For current display period, use multi-period method
+        // which pulls each measure's score from its own current period
+        final allScores =
+            await repository.getUserScoresForCurrentPeriods(currentUser.id);
+        leadScores =
+            allScores.where((s) => s.measureType == 'LEAD').toList();
+        lagScores =
+            allScores.where((s) => s.measureType == 'LAG').toList();
+      } else {
+        // For historical periods, scores are frozen in their period
+        leadScores = await repository.getUserScoresByType(
+          currentUser.id,
+          period.id,
+          'LEAD',
+        );
+        lagScores = await repository.getUserScoresByType(
+          currentUser.id,
+          period.id,
+          'LAG',
+        );
+      }
+
       final leaderboardData = await repository.getLeaderboard(period.id);
 
       state = AsyncData(ScoreboardState(
@@ -398,4 +415,137 @@ class ScoreboardNotifier extends _$ScoreboardNotifier {
   Future<void> refresh() async {
     ref.invalidateSelf();
   }
+}
+
+// ============================================
+// LEADERBOARD FILTER
+// ============================================
+
+/// Filter mode for leaderboard.
+enum LeaderboardFilterMode {
+  all,
+  branch,
+  region,
+}
+
+/// State for leaderboard filters.
+class LeaderboardFilter {
+  final ScoringPeriod? selectedPeriod;
+  final LeaderboardFilterMode filterMode;
+  final String? selectedBranchId;
+  final String? selectedRegionalOfficeId;
+  final String searchQuery;
+
+  const LeaderboardFilter({
+    this.selectedPeriod,
+    this.filterMode = LeaderboardFilterMode.all,
+    this.selectedBranchId,
+    this.selectedRegionalOfficeId,
+    this.searchQuery = '',
+  });
+
+  LeaderboardFilter copyWith({
+    ScoringPeriod? selectedPeriod,
+    LeaderboardFilterMode? filterMode,
+    String? selectedBranchId,
+    String? selectedRegionalOfficeId,
+    String? searchQuery,
+  }) {
+    return LeaderboardFilter(
+      selectedPeriod: selectedPeriod ?? this.selectedPeriod,
+      filterMode: filterMode ?? this.filterMode,
+      selectedBranchId: selectedBranchId ?? this.selectedBranchId,
+      selectedRegionalOfficeId:
+          selectedRegionalOfficeId ?? this.selectedRegionalOfficeId,
+      searchQuery: searchQuery ?? this.searchQuery,
+    );
+  }
+}
+
+/// Notifier for managing leaderboard filter state.
+@riverpod
+class LeaderboardFilterNotifier extends _$LeaderboardFilterNotifier {
+  @override
+  LeaderboardFilter build() => const LeaderboardFilter();
+
+  /// Select a period.
+  void selectPeriod(ScoringPeriod period) {
+    state = state.copyWith(selectedPeriod: period);
+  }
+
+  /// Set filter mode and update corresponding IDs.
+  Future<void> setFilterMode(LeaderboardFilterMode mode) async {
+    if (mode == LeaderboardFilterMode.branch) {
+      // Get user's branch
+      final user = await ref.read(currentUserProvider.future);
+      state = state.copyWith(
+        filterMode: mode,
+        selectedBranchId: user?.branchId,
+        selectedRegionalOfficeId: null,
+      );
+    } else if (mode == LeaderboardFilterMode.region) {
+      // Get user's region
+      final user = await ref.read(currentUserProvider.future);
+      state = state.copyWith(
+        filterMode: mode,
+        selectedBranchId: null,
+        selectedRegionalOfficeId: user?.regionalOfficeId,
+      );
+    } else {
+      state = state.copyWith(
+        filterMode: mode,
+        selectedBranchId: null,
+        selectedRegionalOfficeId: null,
+      );
+    }
+  }
+
+  /// Set search query.
+  void setSearchQuery(String query) {
+    state = state.copyWith(searchQuery: query);
+  }
+
+  /// Reset filters to default.
+  void reset() {
+    state = const LeaderboardFilter();
+  }
+}
+
+/// Get filtered leaderboard based on current filter state.
+@riverpod
+Future<List<LeaderboardEntry>> filteredLeaderboard(
+  ref,
+  String periodId, {
+  String? branchId,
+  String? regionalOfficeId,
+  String? searchQuery,
+}) async {
+  // ignore: argument_type_not_assignable
+  final repository = ref.watch(scoreboardRepositoryProvider);
+  // ignore: return_of_invalid_type
+  return repository.getLeaderboardWithFilters(
+    periodId,
+    branchId: branchId,
+    regionalOfficeId: regionalOfficeId,
+    searchQuery: searchQuery,
+    limit: 100,
+  );
+}
+
+/// Get team summary for branch or region.
+@riverpod
+Future<TeamSummary?> teamSummary(
+  ref,
+  String periodId, {
+  String? branchId,
+  String? regionalOfficeId,
+}) async {
+  // ignore: argument_type_not_assignable
+  final repository = ref.watch(scoreboardRepositoryProvider);
+  // ignore: return_of_invalid_type
+  return repository.getTeamSummary(
+    periodId,
+    branchId: branchId,
+    regionalOfficeId: regionalOfficeId,
+  );
 }

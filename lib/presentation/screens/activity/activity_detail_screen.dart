@@ -121,6 +121,13 @@ class ActivityDetailScreen extends ConsumerWidget {
                         leading: Icon(_getObjectTypeIcon(activity.objectType)),
                         title: Text(_getObjectTypeLabel(activity.objectType)),
                         subtitle: Text(activity.objectName!),
+                        onTap: () => _navigateToObject(context, activity),
+                      ),
+                    if (activity.keyPersonName != null)
+                      ListTile(
+                        leading: const Icon(Icons.person),
+                        title: const Text('PIC'),
+                        subtitle: Text(activity.keyPersonName!),
                       ),
                     if (activity.summary != null)
                       ListTile(
@@ -723,6 +730,26 @@ class ActivityDetailScreen extends ConsumerWidget {
     }
   }
 
+  void _navigateToObject(BuildContext context, Activity activity) {
+    switch (activity.objectType) {
+      case ActivityObjectType.customer:
+        if (activity.customerId != null) {
+          context.go('/home/customers/${activity.customerId}');
+        }
+        break;
+      case ActivityObjectType.hvc:
+        if (activity.hvcId != null) {
+          context.go('/home/hvcs/${activity.hvcId}');
+        }
+        break;
+      case ActivityObjectType.broker:
+        if (activity.brokerId != null) {
+          context.go('/home/brokers/${activity.brokerId}');
+        }
+        break;
+    }
+  }
+
   String _formatDateTime(DateTime dt) {
     // Ensure we display in local time
     final localDt = dt.toLocal();
@@ -818,21 +845,19 @@ class ActivityDetailScreen extends ConsumerWidget {
     );
   }
 
-  void _openInMaps(BuildContext context, double lat, double lon) {
-    // Open in Google Maps via URL
-    final url = 'https://www.google.com/maps/search/?api=1&query=$lat,$lon';
-    // Using launchUrl would require url_launcher, for now just show snackbar
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text('Koordinat: $lat, $lon'),
-        action: SnackBarAction(
-          label: 'Copy',
-          onPressed: () {
-            // TODO: Copy to clipboard
-          },
-        ),
-      ),
-    );
+  Future<void> _openInMaps(BuildContext context, double lat, double lon) async {
+    final url = Uri.parse('https://www.google.com/maps/search/?api=1&query=$lat,$lon');
+    if (await canLaunchUrl(url)) {
+      await launchUrl(url, mode: LaunchMode.externalApplication);
+    } else {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Tidak dapat membuka peta. Koordinat: $lat, $lon'),
+          ),
+        );
+      }
+    }
   }
 
   Color _getAuditLogColor(String action) {

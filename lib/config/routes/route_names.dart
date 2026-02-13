@@ -72,8 +72,10 @@ abstract class RouteNames {
   // ============================================
   // 4DX ROUTES
   // ============================================
-  
+
   static const String scoreboard = 'scoreboard';
+  static const String leaderboard = 'leaderboard';
+  static const String measureDetail = 'measure-detail';
   static const String targets = 'targets';
   static const String cadence = 'cadence';
   static const String cadenceDetail = 'cadence-detail';
@@ -113,13 +115,23 @@ abstract class RouteNames {
   // 4DX Configuration
   static const String admin4dx = 'admin-4dx';
   static const String adminMeasures = 'admin-measures';
-  static const String adminMeasureForm = 'admin-measure-form';
+  static const String adminMeasureCreate = 'admin-measure-create';
+  static const String adminMeasureEdit = 'admin-measure-edit';
   static const String adminPeriods = 'admin-periods';
-  static const String adminPeriodForm = 'admin-period-form';
+  static const String adminPeriodCreate = 'admin-period-create';
+  static const String adminPeriodEdit = 'admin-period-edit';
 
   // Bulk Upload
   static const String adminBulkUpload = 'admin-bulk-upload';
   static const String adminBulkUploadEntity = 'admin-bulk-upload-entity';
+
+  // Target Management
+  static const String adminTargets = 'admin-targets';
+  static const String adminTargetForm = 'admin-target-form';
+
+  // Team Targets (Manager-facing)
+  static const String teamTargets = 'team-targets';
+  static const String teamTargetForm = 'team-target-form';
 
   // Cadence Configuration
   static const String adminCadence = 'admin-cadence';
@@ -175,6 +187,8 @@ abstract class RoutePaths {
 
   // 4DX
   static const String scoreboard = '/home/scoreboard';
+  static const String leaderboard = '/home/scoreboard/leaderboard';
+  static const String measureDetail = '/home/scoreboard/measure/:measureId';
   static const String targets = '/home/targets';
   static const String cadence = '/home/cadence';
   static const String cadenceDetail = '/home/cadence/:id';
@@ -206,13 +220,23 @@ abstract class RoutePaths {
   // 4DX Configuration
   static const String admin4dx = '/admin/4dx';
   static const String adminMeasures = '/admin/4dx/measures';
-  static const String adminMeasureForm = '/admin/4dx/measures/form';
+  static const String adminMeasureCreate = '/admin/4dx/measures/create';
+  static const String adminMeasureEdit = '/admin/4dx/measures/:id';
   static const String adminPeriods = '/admin/4dx/periods';
-  static const String adminPeriodForm = '/admin/4dx/periods/form';
+  static const String adminPeriodCreate = '/admin/4dx/periods/create';
+  static const String adminPeriodEdit = '/admin/4dx/periods/:id';
 
   // Bulk Upload
   static const String adminBulkUpload = '/admin/bulk-upload';
   static const String adminBulkUploadEntity = '/admin/bulk-upload/:entityType';
+
+  // Target Management
+  static const String adminTargets = '/admin/4dx/targets';
+  static const String adminTargetForm = '/admin/4dx/targets/:userId';
+
+  // Team Targets (Manager-facing)
+  static const String teamTargets = '/home/team-targets';
+  static const String teamTargetForm = '/home/team-targets/:userId';
 
   // Cadence Configuration
   static const String adminCadence = '/admin/cadence';

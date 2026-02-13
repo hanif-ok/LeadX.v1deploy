@@ -12,7 +12,6 @@ import 'tables/pipelines.dart';
 import 'tables/scoring.dart';
 import 'tables/sync_queue.dart';
 import 'tables/users.dart';
-import 'tables/wigs.dart';
 
 part 'app_database.g.dart';
 
@@ -79,13 +78,7 @@ part 'app_database.g.dart';
     ScoringPeriods,
     UserTargets,
     UserScores,
-    UserScoreSnapshots,
-
-    // ============================================
-    // WIG - WILDLY IMPORTANT GOALS (2 tables)
-    // ============================================
-    Wigs,
-    WigProgress,
+    UserScoreAggregates,
 
     // ============================================
     // CADENCE (3 tables)
@@ -118,7 +111,7 @@ class AppDatabase extends _$AppDatabase {
 
   /// Database schema version - increment on schema changes
   @override
-  int get schemaVersion => 5;
+  int get schemaVersion => 9;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -142,11 +135,9 @@ class AppDatabase extends _$AppDatabase {
             await m.addColumn(
                 pipelineStageHistoryItems, pipelineStageHistoryItems.createdLocally);
           }
-          // Migration from v4 to v5: Add WIG tables and update scoring tables
+          // Migration from v4 to v5: Update scoring tables
+          // Note: WIG tables were removed in v8 (consolidated into measures)
           if (from < 5) {
-            // Add new WIG tables
-            await m.createTable(wigs);
-            await m.createTable(wigProgress);
             // Add new columns to measure_definitions
             await m.addColumn(measureDefinitions, measureDefinitions.weight);
             await m.addColumn(measureDefinitions, measureDefinitions.defaultTarget);
@@ -160,6 +151,37 @@ class AppDatabase extends _$AppDatabase {
             await m.addColumn(userScores, userScores.score);
             await m.addColumn(userScores, userScores.rank);
             // Rename PeriodSummaryScores to UserScoreSnapshots handled by recreation
+          }
+          // Migration from v5 to v6: Add Cadence tables
+          if (from < 6) {
+            await m.createTable(cadenceScheduleConfig);
+            await m.createTable(cadenceMeetings);
+            await m.createTable(cadenceParticipants);
+          }
+          // Migration from v6 to v7: Add preMeetingHours column to cadence_schedule_config
+          // Note: Only needed for databases created before preMeetingHours was added to table schema.
+          // Databases created with v6 already have this column from createTable.
+          if (from < 7) {
+            // Check if column already exists (it will if table was created with current schema)
+            final result = await customSelect(
+              "SELECT COUNT(*) as cnt FROM pragma_table_info('cadence_schedule_config') WHERE name = 'pre_meeting_hours'",
+            ).getSingle();
+            final columnExists = (result.data['cnt'] as int) > 0;
+
+            if (!columnExists) {
+              await m.addColumn(
+                  cadenceScheduleConfig, cadenceScheduleConfig.preMeetingHours);
+            }
+          }
+          // Migration from v7 to v8: Drop WIG tables (consolidated into measures)
+          if (from < 8) {
+            await customStatement('DROP TABLE IF EXISTS wig_progress');
+            await customStatement('DROP TABLE IF EXISTS wigs');
+          }
+          // Migration from v8 to v9: Rename user_score_snapshots to user_score_aggregates
+          if (from < 9) {
+            await customStatement(
+                'ALTER TABLE user_score_snapshots RENAME TO user_score_aggregates');
           }
         },
         beforeOpen: (details) async {

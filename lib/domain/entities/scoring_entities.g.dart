@@ -19,6 +19,11 @@ _$MeasureDefinitionImpl _$$MeasureDefinitionImplFromJson(
   calculationFormula: json['calculationFormula'] as String?,
   sourceTable: json['sourceTable'] as String?,
   sourceCondition: json['sourceCondition'] as String?,
+  weight: (json['weight'] as num?)?.toDouble() ?? 1.0,
+  defaultTarget: (json['defaultTarget'] as num?)?.toDouble() ?? 0,
+  periodType: json['periodType'] as String?,
+  templateType: json['templateType'] as String?,
+  templateConfig: json['templateConfig'] as Map<String, dynamic>?,
   isActive: json['isActive'] as bool? ?? true,
   sortOrder: (json['sortOrder'] as num?)?.toInt() ?? 0,
   createdAt: json['createdAt'] == null
@@ -42,6 +47,11 @@ Map<String, dynamic> _$$MeasureDefinitionImplToJson(
   'calculationFormula': instance.calculationFormula,
   'sourceTable': instance.sourceTable,
   'sourceCondition': instance.sourceCondition,
+  'weight': instance.weight,
+  'defaultTarget': instance.defaultTarget,
+  'periodType': instance.periodType,
+  'templateType': instance.templateType,
+  'templateConfig': instance.templateConfig,
   'isActive': instance.isActive,
   'sortOrder': instance.sortOrder,
   'createdAt': instance.createdAt?.toIso8601String(),
@@ -56,6 +66,7 @@ _$ScoringPeriodImpl _$$ScoringPeriodImplFromJson(Map<String, dynamic> json) =>
       startDate: DateTime.parse(json['startDate'] as String),
       endDate: DateTime.parse(json['endDate'] as String),
       isCurrent: json['isCurrent'] as bool? ?? false,
+      isLocked: json['isLocked'] as bool? ?? false,
       isActive: json['isActive'] as bool? ?? true,
       createdAt: json['createdAt'] == null
           ? null
@@ -73,6 +84,7 @@ Map<String, dynamic> _$$ScoringPeriodImplToJson(_$ScoringPeriodImpl instance) =>
       'startDate': instance.startDate.toIso8601String(),
       'endDate': instance.endDate.toIso8601String(),
       'isCurrent': instance.isCurrent,
+      'isLocked': instance.isLocked,
       'isActive': instance.isActive,
       'createdAt': instance.createdAt?.toIso8601String(),
       'updatedAt': instance.updatedAt?.toIso8601String(),
@@ -162,6 +174,8 @@ _$PeriodSummaryImpl _$$PeriodSummaryImplFromJson(Map<String, dynamic> json) =>
       totalLeadScore: (json['totalLeadScore'] as num?)?.toDouble() ?? 0,
       totalLagScore: (json['totalLagScore'] as num?)?.toDouble() ?? 0,
       compositeScore: (json['compositeScore'] as num?)?.toDouble() ?? 0,
+      bonusPoints: (json['bonusPoints'] as num?)?.toDouble() ?? 0,
+      penaltyPoints: (json['penaltyPoints'] as num?)?.toDouble() ?? 0,
       rank: (json['rank'] as num?)?.toInt(),
       rankChange: (json['rankChange'] as num?)?.toInt(),
       calculatedAt: json['calculatedAt'] == null
@@ -185,6 +199,8 @@ Map<String, dynamic> _$$PeriodSummaryImplToJson(_$PeriodSummaryImpl instance) =>
       'totalLeadScore': instance.totalLeadScore,
       'totalLagScore': instance.totalLagScore,
       'compositeScore': instance.compositeScore,
+      'bonusPoints': instance.bonusPoints,
+      'penaltyPoints': instance.penaltyPoints,
       'rank': instance.rank,
       'rankChange': instance.rankChange,
       'calculatedAt': instance.calculatedAt?.toIso8601String(),
@@ -259,3 +275,43 @@ Map<String, dynamic> _$$DashboardStatsImplToJson(
   'weeklyPipelinesWon': instance.weeklyPipelinesWon,
   'weeklyPremiumWon': instance.weeklyPremiumWon,
 };
+
+_$TeamSummaryImpl _$$TeamSummaryImplFromJson(Map<String, dynamic> json) =>
+    _$TeamSummaryImpl(
+      id: json['id'] as String,
+      periodId: json['periodId'] as String,
+      branchId: json['branchId'] as String?,
+      regionalOfficeId: json['regionalOfficeId'] as String?,
+      branchName: json['branchName'] as String?,
+      regionalOfficeName: json['regionalOfficeName'] as String?,
+      averageScore: (json['averageScore'] as num?)?.toDouble() ?? 0,
+      averageLeadScore: (json['averageLeadScore'] as num?)?.toDouble() ?? 0,
+      averageLagScore: (json['averageLagScore'] as num?)?.toDouble() ?? 0,
+      teamRank: (json['teamRank'] as num?)?.toInt(),
+      totalTeams: (json['totalTeams'] as num?)?.toInt(),
+      teamMembersCount: (json['teamMembersCount'] as num?)?.toInt() ?? 0,
+      scoreChange: (json['scoreChange'] as num?)?.toDouble(),
+      rankChange: (json['rankChange'] as num?)?.toInt(),
+      calculatedAt: json['calculatedAt'] == null
+          ? null
+          : DateTime.parse(json['calculatedAt'] as String),
+    );
+
+Map<String, dynamic> _$$TeamSummaryImplToJson(_$TeamSummaryImpl instance) =>
+    <String, dynamic>{
+      'id': instance.id,
+      'periodId': instance.periodId,
+      'branchId': instance.branchId,
+      'regionalOfficeId': instance.regionalOfficeId,
+      'branchName': instance.branchName,
+      'regionalOfficeName': instance.regionalOfficeName,
+      'averageScore': instance.averageScore,
+      'averageLeadScore': instance.averageLeadScore,
+      'averageLagScore': instance.averageLagScore,
+      'teamRank': instance.teamRank,
+      'totalTeams': instance.totalTeams,
+      'teamMembersCount': instance.teamMembersCount,
+      'scoreChange': instance.scoreChange,
+      'rankChange': instance.rankChange,
+      'calculatedAt': instance.calculatedAt?.toIso8601String(),
+    };
